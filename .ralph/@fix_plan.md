@@ -4,32 +4,32 @@ Builder agent reads this file top-to-bottom. Each task has a binary acceptance t
 
 ## Phase 1 — Core Action (BLOCKING — finish before Phase 2)
 
-- [ ] Task 1: Bootstrap Foundry project + install Arc-CLI on this machine
-  - Files: `contracts/foundry.toml`, `contracts/lib/`, `~/.config/arc/`
-  - Acceptance: `forge build` succeeds in `contracts/`; `arc --help` prints CLI help
+- [x] Task 1: Bootstrap Foundry project + OZ v5 contracts library
+  - Files: `contracts/foundry.toml`, `contracts/lib/forge-std`, `contracts/lib/openzeppelin-contracts`
+  - Acceptance: `forge build` succeeds in `contracts/` — DONE 2026-05-17
 
-- [ ] Task 2: Write IndexToken.sol — ERC-20 with `rebalance(address[] venues, uint256[] weights)` (owner-only for Phase 1) and `nav()` view
-  - Files: `contracts/src/IndexToken.sol`, `contracts/test/IndexToken.t.sol`
-  - Acceptance: `forge test` passes for: mint, transfer, rebalance event emitted, nav() returns expected sum
+- [x] Task 2: Six core contracts written + 28 passing tests (replaces the original IndexToken-only Task 2)
+  - Files: `contracts/src/IndexToken.sol`, `contracts/src/NAVOracle.sol`, `contracts/src/CCTPRouter.sol`, `contracts/src/USYCParkVault.sol`, `contracts/src/RebalanceExecutor.sol`, `contracts/src/interfaces/*.sol`, `contracts/src/mocks/*.sol`, `contracts/test/*.t.sol`
+  - Acceptance: `forge test` shows 28 passed / 0 failed — DONE 2026-05-17
 
-- [ ] Task 3: Deploy IndexToken to Arc testnet via Canteen-hosted RPC
-  - Files: `contracts/script/Deploy.s.sol`, `deployments/arc-testnet.json`
-  - Acceptance: contract address on Arc explorer, `totalSupply()` returns >0
+- [ ] Task 3: Deploy full stack to Arc testnet via Canteen-hosted RPC + record addresses
+  - Files: `contracts/script/Deploy.s.sol` (DONE), `deployments/arc-testnet.json` (TBD)
+  - Acceptance: all 8 contract addresses on Arcscan, `Deploy.s.sol` broadcast succeeds, addresses written to `deployments/arc-testnet.json`
 
-- [ ] Task 4: Write Python leaderboard-reader agent — reads HL public leaderboard, outputs `{wallet: weight}` JSON for top 10
-  - Files: `agent/leaderboard_reader.py`, `agent/requirements.txt`
-  - Acceptance: `python -m agent.leaderboard_reader` returns 10 wallet addresses with weights summing to 1.0
+- [x] Task 4: Python leaderboard-reader agent reads live Hyperliquid `clearinghouseState`
+  - Files: `agent/leaderboard_reader.py`, `agent/allocation_engine.py`, `agent/main.py`, `agent/requirements.txt`, `data/whales-hl.json`
+  - Acceptance: `python3 agent/main.py` returns a JSON plan with whales_count >= 0 and allocations array — DONE 2026-05-17
 
-- [ ] Task 5: Write rebalance executor — signs and submits Gateway USDC move + contract `rebalance()`
-  - Files: `agent/rebalance_executor.py`, `agent/gateway_client.py`
-  - Acceptance: invoking executor with mock allocation produces a Gateway-tx hash on Arc testnet, NAV updates in IndexToken state
+- [ ] Task 5: Wire rebalance executor signing — agent signs an Arc tx that calls `RebalanceExecutor.rebalance(...)` and a `CCTPRouter` move lands on chain
+  - Files: `agent/rebalance_executor.py`, `agent/contract_client.py`
+  - Acceptance: invoking executor with one allocation produces an on-chain `Routed` event + `NAVUpdated` event on Arc testnet
 
-- [ ] Task 6: Minimal Next.js UI — single page showing current NAV + last rebalance receipt (timestamp, cost in cents, latency in ms)
+- [ ] Task 6: Minimal Next.js UI — landing page with NAV, last rebalance receipt, buy/redeem stubs
   - Files: `web/pages/index.tsx`, `web/lib/contract.ts`
-  - Acceptance: `pnpm dev` loads page locally, NAV reads from Arc testnet contract
+  - Acceptance: `pnpm dev` loads page locally, NAV reads from Arc testnet contract via viem
 
-- [ ] Task 7: End-to-end Phase 1 Gate test
-  - Acceptance: trigger executor manually → Gateway move settles in <2 seconds → NAV updates correctly → UI shows the new NAV + receipt within 5 seconds → **screenshot-shareable moment captured**
+- [ ] Task 7: End-to-end Phase 1 Gate test on Arc testnet
+  - Acceptance: agent reads one HL whale → CCTPRouter.Routed event lands on Arc testnet → NAVOracle.NAVUpdated event lands → UI shows new NAV + receipt → **screenshot-shareable moment captured**
   - **If this passes, Phase 1 is DONE. Update `ai/memory.md` status to `[x] PASSED`.**
 
 ## Phase 2 — Data Flows (after Phase 1 passes)

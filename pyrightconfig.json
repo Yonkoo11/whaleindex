@@ -1,0 +1,6 @@
+{
+  "include": ["agent"],
+  "extraPaths": ["agent"],
+  "reportMissingImports": "warning",
+  "pythonVersion": "3.11"
+}

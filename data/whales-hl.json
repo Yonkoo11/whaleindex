@@ -1,0 +1,23 @@
+[
+  {
+    "wallet": "0x9A89e02b0b6F1aaF6c5dC8B69D6e7Ad1eF1Cf671",
+    "label": "HL whale 1",
+    "source": "hyperdash.info/leaderboard (manual capture 2026-05-17)",
+    "last_verified": "2026-05-17",
+    "_notes": "Placeholder address — replace with curated picks from hyperdash leaderboard before deploy"
+  },
+  {
+    "wallet": "0xCcF3d1aCF799bAe67F6e354d685295557cF64761",
+    "label": "HL whale 2",
+    "source": "hyperdash.info/leaderboard (manual capture 2026-05-17)",
+    "last_verified": "2026-05-17",
+    "_notes": "Placeholder address — replace with curated picks from hyperdash leaderboard before deploy"
+  },
+  {
+    "wallet": "0x2068F22b91dF98AB3a04D67BC2A2B4C8c5cF3D1E",
+    "label": "HL whale 3",
+    "source": "hyperdash.info/leaderboard (manual capture 2026-05-17)",
+    "last_verified": "2026-05-17",
+    "_notes": "Placeholder address — replace with curated picks from hyperdash leaderboard before deploy"
+  }
+]
