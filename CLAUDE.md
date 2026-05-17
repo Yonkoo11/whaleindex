@@ -4,6 +4,20 @@
 
 The user is a vibecoder with zero coding background, also a medical intern. **Talk in plain English. No dev jargon.** Say "save point" not "commit", "publish" not "push", "version" not "branch". Summarize terminal output in one sentence; never paste raw error messages. Describe what changed by what the user sees in the live app, not by what files were edited. Auto-save after every task (`git add` + `git commit`); never ask. Fix failing tests silently. Use `/compact` proactively, never ask permission.
 
+## SECURITY — KEYS NEVER IN REPO OR CONTEXT
+
+The deployer + operator + ARC RPC keys live ONLY in `~/.zshenv`. Hard rules:
+
+- **NEVER read `~/.zshenv`, `~/.zshrc`, `~/.bashrc`, `~/.netrc`, SSH keys, or any shell-rc file.** Not `Read`, not `cat`, not `head`, not `grep`. Project hook will block.
+- **NEVER print, echo, or log key values.** `echo $DEPLOYER_PRIVATE_KEY`, `print(os.getenv("KEY"))`, `vm.toString(privateKey)` are all banned.
+- **NEVER commit `.env`** — gitignored; verify `git diff --cached` before every save point.
+- **NEVER add a key value to any file, including this one.** Reference env vars by name only.
+- **Foundry deploy uses `vm.envUint("DEPLOYER_PRIVATE_KEY")`** — reads process env at runtime, not from disk. Safe pattern.
+- **Python agent uses `os.getenv("OPERATOR_PRIVATE_KEY")`** — same pattern.
+- **If a key ever appears in chat or output, stop immediately and tell the user to rotate.**
+
+Full security playbook: `SECURITY.md`. Read it before any deploy or signing work.
+
 ---
 
 ## Phase 1 Gate (BLOCKING — DO NOT START PHASE 2 UNTIL PASSED)
