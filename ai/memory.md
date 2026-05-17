@@ -23,7 +23,20 @@
 - Demo video (Phase 4)
 - Builder-code monetization layer (V2 stretch)
 
-**Status:** [ ] NOT STARTED
+**Status:** [partial] Local end-to-end proven on anvil (agent -> RebalanceExecutor -> CCTPRouter + NAVOracle); UI page reads NAV + last Routed event. NOT YET on Arc testnet — blocked on ARC CLI install + DEPLOYER_PRIVATE_KEY in ~/.zshenv. Whale watchlists are user-curated placeholders (Hyperdash 403 Cloudflare, Drift dlob.drift.trade 503).
+
+**Verified 2026-05-17:**
+- Smoke test `python3 -m agent._smoke_test_local` runs end-to-end against local anvil (chain 31337). Self-seeds treasury. Output: "Moved $5.00 USDC to Arbitrum. Index NAV: $0.00 -> $15.00. Gas used: 363,901."
+- 28 contract tests pass.
+- Repo published: github.com/Yonkoo11/whaleindex
+- GitHub Pages enabled from master:/docs -> https://yonkoo11.github.io/whaleindex/ (build queued at 17:25 UTC)
+- Page rendering NOT visually verified (puppeteer Chrome not installed); HTML + ESM CDN + RPC reads sanity-checked only.
+
+**Next-session unblockers:**
+- User exports DEPLOYER_PRIVATE_KEY + OPERATOR_PRIVATE_KEY into shell from ~/.zshenv (already there)
+- User runs `uv tool install git+https://github.com/the-canteen-dev/ARC-cli`
+- User provides 5-10 real Hyperdash top-PnL wallet addresses (manually since Hyperdash blocks WebFetch)
+- Then: forge script Deploy.s.sol --rpc-url <arc> --broadcast; write deployments/arc-testnet.json; smoke-test against Arc
 
 ---
 
