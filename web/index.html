@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>WhaleIndex — Phase 1</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 32px 24px;
+      font: 14px/1.5 -apple-system, ui-monospace, SFMono-Regular, Menlo, monospace;
+      color: #d8dee9;
+      background: #0a0e14;
+    }
+    main { max-width: 760px; margin: 0 auto; }
+    h1 { font-size: 18px; margin: 0 0 4px; font-weight: 600; letter-spacing: .02em; }
+    .sub { color: #6b7785; font-size: 12px; margin-bottom: 28px; }
+    .card {
+      border: 1px solid #1f2630;
+      border-radius: 8px;
+      padding: 20px 22px;
+      margin-bottom: 14px;
+      background: #0e131a;
+    }
+    .label { color: #6b7785; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
+    .value { font-size: 22px; font-weight: 500; color: #e6edf3; }
+    .small { font-size: 12px; color: #8a95a3; margin-top: 4px; }
+    .fresh { color: #6cd16c; }
+    .stale { color: #d97757; }
+    .row { display: flex; gap: 24px; flex-wrap: wrap; }
+    .row > div { flex: 1; min-width: 180px; }
+    .controls { display: flex; gap: 10px; margin-bottom: 18px; }
+    select, button {
+      background: #161c25; color: #d8dee9; border: 1px solid #1f2630;
+      border-radius: 6px; padding: 7px 12px; font: inherit; cursor: pointer;
+    }
+    button:hover, select:hover { border-color: #2e3849; }
+    code { background: #161c25; padding: 1px 6px; border-radius: 4px; font-size: 12px; }
+    .err { color: #d97757; font-size: 12px; margin-top: 4px; word-break: break-all; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>WhaleIndex</h1>
+    <div class="sub">Phase 1 — index NAV + most recent rebalance receipt</div>
+
+    <div class="controls">
+      <select id="network">
+        <option value="local">local anvil</option>
+        <option value="arc-testnet">arc testnet</option>
+      </select>
+      <button id="refresh">refresh</button>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div>
+          <div class="label">Index NAV (USDC)</div>
+          <div class="value" id="nav">—</div>
+          <div class="small" id="nav-fresh">—</div>
+        </div>
+        <div>
+          <div class="label">Share price (USDC / WHALE)</div>
+          <div class="value" id="sp">—</div>
+          <div class="small" id="supply">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Most recent rebalance</div>
+      <div class="value" id="last-move">no rebalance events yet</div>
+      <div class="small" id="last-block">—</div>
+      <div class="small" id="last-tx">—</div>
+    </div>
+
+    <div class="card">
+      <div class="label">Connection</div>
+      <div class="small" id="conn">connecting…</div>
+      <div class="err" id="err"></div>
+    </div>
+  </main>
+
+  <script type="module">
+    import { JsonRpcProvider, Contract } from "https://esm.sh/ethers@6.13.4";
+
+    const NETWORKS = {
+      "local": {
+        rpc: "http://127.0.0.1:8545",
+        addresses: {
+          NAVOracle:  "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+          IndexToken: "0x0165878A594ca255338adfa4d48449f69242Eb8F",
+          CCTPRouter: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+        },
+      },
+      "arc-testnet": { rpc: "", addresses: {} },  // populated after Arc deploy
+    };
+
+    const ABI_NAV = [
+      "function nav() view returns (uint256)",
+      "function isFresh() view returns (bool)",
+      "function updatedAt() view returns (uint64)",
+    ];
+    const ABI_INDEX = [
+      "function totalSupply() view returns (uint256)",
+      "function sharePrice() view returns (uint256)",
+      "function decimals() view returns (uint8)",
+    ];
+    const ABI_ROUTER = [
+      "event Routed(uint64 indexed nonce, uint32 indexed destinationDomain, bytes32 mintRecipient, uint256 amount, uint256 maxFee, uint32 minFinalityThreshold)",
+    ];
+
+    const DOMAINS = {
+      0: "Ethereum", 1: "Avalanche", 2: "OP", 3: "Arbitrum",
+      5: "Solana", 6: "Base", 7: "Polygon", 10: "Unichain",
+    };
+
+    const $ = id => document.getElementById(id);
+    const fmt = (raw, dec) => (Number(raw) / 10 ** dec).toLocaleString(undefined, { maximumFractionDigits: 4 });
+
+    async function refresh() {
+      const net = $("network").value;
+      const cfg = NETWORKS[net];
+      $("err").textContent = "";
+      $("conn").textContent = `RPC: ${cfg.rpc || "(not configured)"}`;
+
+      if (!cfg.rpc) { $("err").textContent = "no RPC configured for this network"; return; }
+      let provider;
+      try {
+        provider = new JsonRpcProvider(cfg.rpc);
+        const net_ = await provider.getNetwork();
+        $("conn").textContent = `RPC ${cfg.rpc} — chain ${net_.chainId}`;
+      } catch (e) { $("err").textContent = "RPC unreachable: " + e.message; return; }
+
+      try {
+        const nav = new Contract(cfg.addresses.NAVOracle, ABI_NAV, provider);
+        const idx = new Contract(cfg.addresses.IndexToken, ABI_INDEX, provider);
+        const navUsdc = await nav.nav();
+        const isFresh = await nav.isFresh();
+        const updatedAt = await nav.updatedAt();
+        const supply = await idx.totalSupply();
+        const sp = await idx.sharePrice();
+
+        $("nav").textContent = "$" + fmt(navUsdc, 6);
+        $("nav-fresh").textContent = isFresh
+          ? "fresh — updated " + new Date(Number(updatedAt) * 1000).toLocaleTimeString()
+          : "STALE — last update " + (updatedAt > 0n ? new Date(Number(updatedAt) * 1000).toLocaleString() : "never");
+        $("nav-fresh").className = "small " + (isFresh ? "fresh" : "stale");
+        $("sp").textContent = fmt(sp, 6);
+        $("supply").textContent = "supply: " + fmt(supply, 18) + " WHALE";
+
+        const router = new Contract(cfg.addresses.CCTPRouter, ABI_ROUTER, provider);
+        const latest = await provider.getBlockNumber();
+        const from = Math.max(0, latest - 5000);
+        const events = await router.queryFilter("Routed", from, latest);
+        const last = events[events.length - 1];
+        if (last) {
+          const domain = Number(last.args.destinationDomain);
+          const venue = DOMAINS[domain] || `domain #${domain}`;
+          $("last-move").textContent = `$${fmt(last.args.amount, 6)} USDC -> ${venue}`;
+          $("last-block").textContent = `block ${last.blockNumber}, CCTP V2 nonce ${last.args.nonce}`;
+          $("last-tx").textContent = `tx ${last.transactionHash.slice(0, 10)}…${last.transactionHash.slice(-6)}`;
+        } else {
+          $("last-move").textContent = "no rebalance events in last 5000 blocks";
+          $("last-block").textContent = "—";
+          $("last-tx").textContent = "—";
+        }
+      } catch (e) {
+        $("err").textContent = "read failed: " + (e.shortMessage || e.message);
+      }
+    }
+
+    $("refresh").addEventListener("click", refresh);
+    $("network").addEventListener("change", refresh);
+    refresh();
+    setInterval(refresh, 8000);
+  </script>
+</body>
+</html>
