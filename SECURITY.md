@@ -1,33 +1,56 @@
 # Security
 
-## Keys never live in this repo
+## Where keys live
 
-The deployer private key, operator private key, and Arc RPC key live ONLY in `~/.zshenv` on the operator's machine. They are loaded into the shell environment at session start and consumed at runtime by Foundry (`vm.envUint("DEPLOYER_PRIVATE_KEY")`) and the Python agent (`os.getenv("OPERATOR_PRIVATE_KEY")`).
+The deployer private key, operator private key, and any RPC keys live ONLY in `~/.zshenv` on the operator's machine. Zsh auto-sources `~/.zshenv` for every shell invocation (including non-interactive), so values land in process env at runtime. Reading the source file is never necessary and risks pasting the value into a conversation context.
 
-Hard rules for everyone (and every AI agent) working on this repo:
+## Hard rules (apply with no exceptions)
 
-1. **Never read `~/.zshenv` or any shell-rc file.** Not with `cat`, `grep`, `head`, `tail`, `Read`, or any other tool. Globally enforced by the project's PreToolUse hook.
-2. **Never print key values.** Not in bash, not in Python, not in tests, not in logs. `print(os.getenv("KEY"))` is banned.
-3. **Never commit `.env`** — covered by `.gitignore`, but verify with `git diff --cached` before every commit.
-4. **Never use `git add -A`** for the first commit of a new file that might contain a key. Add files by explicit name.
-5. **Foundry broadcasts must use the env-var key reference**, never a hardcoded value. The `Deploy.s.sol` script uses `vm.envUint("DEPLOYER_PRIVATE_KEY")` which reads from the process env at runtime, not from any file.
-6. **If a key is ever pasted into a chat, the operator must rotate it immediately.** Don't continue the session "carefully" — rotate, then continue.
-7. **Foundry `broadcast/` artifacts** sometimes contain the deployer address but not the key. Still inspect before pushing if you ever flip them out of `.gitignore`.
+1. **Never read `~/.zshenv`, `~/.zshrc`, `~/.zprofile`, `~/.bashrc`, `~/.bash_profile`, `~/.netrc`, `~/.npmrc`, `~/.git-credentials`, or any SSH key.** Not with `cat`, `head`, `tail`, `grep -v`, `Read`, or any other tool. PreToolUse hook blocks these; if the hook is silent, treat it as misconfiguration, not invitation.
+2. **Never print key values.** `echo $DEPLOYER_PRIVATE_KEY`, `print(os.getenv("KEY"))`, `vm.toString(privateKey)`, `console.log(process.env.KEY)` are all banned.
+3. **Never commit `.env*`, `*.key`, `*.pem`, `keystore/`, `secrets/`.** Covered by `.gitignore`; verify `git diff --cached` before every save point.
+4. **Never use `git add -A` for a first save point in a new project.** Add by explicit file name until you've checked the diff manually.
+5. **Foundry deploys MUST use `vm.envUint("DEPLOYER_PRIVATE_KEY")`** — reads process env at runtime. Never hardcode. Never `--private-key 0x...` on the CLI either (it shows in shell history).
+6. **Python agents MUST use `os.getenv("OPERATOR_PRIVATE_KEY")`** — same pattern. Never `dotenv.load_dotenv("~/.zshenv")`. Never `subprocess.check_output(["bash","-c","echo $KEY"])`.
+7. **To CHECK whether a var is set without seeing it:** `[ -n "$VARNAME" ] && echo "set" || echo "not set"` or `echo "${#VARNAME}"` (returns length, not value). Length leaks bits — use the boolean check by default.
+8. **If a key string ever appears in tool output or commit content, STOP immediately and ROTATE.** Don't continue the session "carefully" — rotate the source key, generate a fresh one, file an incident note in `ai/incidents/YYYY-MM-DD-leak.md`.
 
-## Operator wallet (Wallets SDK policy)
+## On-chain blast-radius caps (operator wallet)
 
-The `RebalanceExecutor` enforces an on-chain spending policy: `maxSingleMove` and `dailyCap`. Even if the operator key is compromised, the blast radius is bounded by these caps. Default deployment values:
+Every project that uses an operator key for autonomous on-chain action MUST set a policy struct that caps the damage:
 
-| Param | V1 testnet | Mainnet (proposed V2) |
+| Param | Testnet default | Mainnet default |
 |---|---|---|
 | `maxSingleMove` | 500 USDC | 50,000 USDC |
 | `dailyCap` | 10,000 USDC | 250,000 USDC |
 | Operator multisig | single-sig | 2/3 multisig via Wallets SDK |
 
-## What to do if you suspect a leak
+Enforce the policy at the executor entrypoint, not in client code.
 
-1. Stop. Don't continue any tool calls that touch keys.
-2. Rotate the leaked key on the source (re-issue from Privy/Turnkey/wallet).
-3. Generate a fresh operator address and call `RebalanceExecutor.transferOwnership(newOperator)` from the old one (if it still has access) OR pause via emergency social recovery.
-4. Update `~/.zshenv` with the new key (the operator does this manually, NOT an AI).
-5. File an incident note in `ai/incidents/YYYY-MM-DD-leak.md` so the postmortem is captured.
+## Verification before any save point
+
+Run these checks before `git commit`. If any fails, abort.
+
+```bash
+# 1. No private-key-shaped strings in staged content
+git diff --cached | grep -E '(0x[a-f0-9]{64}|PRIVATE_KEY *= *0x|secret *= *")' && echo "ABORT: key in staged diff"
+
+# 2. No env files staged
+git diff --cached --name-only | grep -E '(^\.env|/\.env|\.envrc$|\.key$|\.pem$)' && echo "ABORT: env file staged"
+
+# 3. No literal-32-byte hex in source
+grep -rE "0x[0-9a-fA-F]{64}" --include="*.sol" --include="*.py" --include="*.ts" --include="*.js" --include="*.json" . | grep -v 'test/' | grep -v 'mocks/' && echo "REVIEW: long hex string in source"
+```
+
+## What to do if a key leaks
+
+1. Stop. No more tool calls that touch keys.
+2. Rotate the source key (re-issue from Privy/Turnkey/wallet).
+3. If the wallet holds funds: `transferOwnership` the executor to a fresh operator address while the old key still works, OR pause via on-chain emergency switch.
+4. Update `~/.zshenv` with the new key (operator does this manually, NEVER an AI).
+5. File an incident note in `ai/incidents/YYYY-MM-DD-leak.md` with: what leaked, how, blast radius, mitigation timeline.
+6. Add the failure mode to the project's threat model in `ai/sponsor-integration.md`.
+
+## Default deny
+
+If any tool, hook, or workflow is unclear about whether it might touch a key — assume YES and apply the rules. This file is the canonical source. Project-level deviations require explicit operator approval.

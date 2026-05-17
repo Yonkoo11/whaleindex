@@ -34,3 +34,9 @@ venv/
 
 # Local deployment artifacts that may contain operator addresses (review before committing)
 deployments/local-*.json
+.private/
+artifacts/
+cache_hardhat/
+.anchor/
+target/
+test-ledger/
