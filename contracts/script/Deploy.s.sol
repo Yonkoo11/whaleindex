@@ -22,6 +22,7 @@ contract DeployScript is Script {
     function run() external {
         uint256 deployerKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
         address operator   = vm.envAddress("OPERATOR_ADDRESS");
+        address deployer   = vm.addr(deployerKey);
 
         vm.startBroadcast(deployerKey);
 
@@ -39,8 +40,8 @@ contract DeployScript is Script {
         CCTPRouter router = new CCTPRouter(address(usdc), address(messenger), domains);
 
         // Park and Index temporarily owned by deployer for ownership wiring.
-        USYCParkVault park = new USYCParkVault(address(usdc), address(usyc), msg.sender);
-        IndexToken index = new IndexToken(address(usdc), address(nav), msg.sender);
+        USYCParkVault park = new USYCParkVault(address(usdc), address(usyc), deployer);
+        IndexToken index = new IndexToken(address(usdc), address(nav), deployer);
 
         RebalanceExecutor exec = new RebalanceExecutor(
             address(usdc),

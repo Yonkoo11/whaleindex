@@ -1,0 +1,21 @@
+{
+  "_meta": {
+    "network": "anvil-local",
+    "chain_id": 31337,
+    "rpc": "http://127.0.0.1:8545",
+    "deployed_at": "2026-05-17",
+    "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cfFFb92266 (anvil account 0)",
+    "operator": "0xf39Fd6e51aad88F6F4ce6aB8827279cfFFb92266",
+    "note": "Local end-to-end proof. Mocks for USDC/USYC/TokenMessenger. Replace with Arc-testnet addresses in deployments/arc-testnet.json when live."
+  },
+  "addresses": {
+    "USDC": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    "USYC": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+    "TokenMessenger": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+    "NAVOracle": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+    "CCTPRouter": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+    "USYCParkVault": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
+    "IndexToken": "0x0165878A594ca255338adfa4d48449f69242Eb8F",
+    "RebalanceExecutor": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
+  }
+}
