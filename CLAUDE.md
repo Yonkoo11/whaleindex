@@ -52,6 +52,12 @@ Full plan: `ai/sponsor-integration.md`. Run Phase 4.5 within 48h of deadline to 
 
 ---
 
+## RFB Mapping (after full RFB content review)
+
+- **Primary: RFB 06 Social Trading Intelligence.** Hits all 5 of "What AI decides" — which whales to follow, allocation per whale, when to stop (degradation detection), multi-signal portfolio (HL+Aster+Polynomial), signal quality. Example-build analog: SmartMirror.
+- **Secondary: RFB 04 Adaptive Portfolio Manager.** Cross-venue rebalancing + USYC parking from this RFB. Does NOT do goal-based or tax-loss-harvesting; don't pitch as RFB 04 primary.
+- **Traction metrics to track (per RFB 06):** leaders tracked, AUM, performance vs raw leader average (risk-adjusted), follower retention.
+
 ## Hackathon Context
 
 - **Window:** 2026-05-11 → 2026-05-25

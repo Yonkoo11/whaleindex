@@ -40,6 +40,8 @@ Builder agent reads this file top-to-bottom. Each task has a binary acceptance t
 - [ ] Task 11: Buyer mint flow — user pays USDC, receives IndexToken
 - [ ] Task 12: Paymaster wiring — buyer without Arc native gas completes purchase
 - [ ] Task 13: Buyer redeem flow — user burns IndexToken, receives USDC
+- [ ] Task 13a: Strategy-degradation detector (RFB 06 explicit ask) — rolling 30d Sharpe per whale, drop from top-10 when rank decays >2 places or Sharpe drops >40%, log eviction with reason to NAV history
+- [ ] Task 13b: Risk-adjusted weighting — replace flat top-10 with Sharpe-weighted allocation across the 10 whales
 
 ## Phase 3 — Product Complete
 

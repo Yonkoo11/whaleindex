@@ -65,9 +65,11 @@
 **Name:** WhaleIndex
 **Pitch (3-5 words):** Whale-tracking index, rebalanced cheaply
 **Tagline (≤ 12 words):** One token, auto-rebalanced across HL forks where whales actually trade.
-**RFB fit:** RFB 04 (Adaptive Portfolio Manager) + RFB 06 (Social Trading Intelligence)
+**RFB fit (PRIMARY):** RFB 06 — Social Trading Intelligence. Matches all 5 of RFB 06's "What AI decides" bullets: (1) which traders to follow (top-10 by HL leaderboard risk-adjusted rank), (2) allocation per trader (weighted by leaderboard score), (3) when to stop following (degradation detection — leaderboard rank decay, see research note #06), (4) portfolio across signal sources (HL + Aster + Polynomial = 3 signal sources), (5) signal quality filtering (whale opt-in attestation in V2). Example-build analog: SmartMirror.
+**RFB fit (SECONDARY):** RFB 04 — Adaptive Portfolio Manager. Matches 3 of 6 bullets: cross-venue rebalancing with Gateway/CCTP, USYC during low-conviction periods, risk reduction in high volatility. Does NOT match: goal-based interfaces, tax-loss harvesting, risk-on/off regime detection.
 **Archetype:** A5 (Intent-Based Aggregator / Solver Network) + B7 (Multi-Agent Coordination)
 **Named precedents:** Urani (Renaissance DeFi 1st, $30K), APY-LO (Unfold #1), OpenFund (Unfold Best Agentic), Latinum (Breakout AI 1st)
+**Traction targets (per RFB 06 metrics):** Number of leaders tracked (10 → 30 by V2) · AUM in test pool · Performance vs raw leader average (risk-adjusted) · Follower retention (Plausible analytics on /buy page)
 
 **Audience:** Retail copy-traders who want one-token exposure to "where smart money is right now" across HL + Aster + Polynomial without setting up venue accounts or running bots.
 
