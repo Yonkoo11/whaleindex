@@ -25,6 +25,13 @@ import httpx
 HL_INFO_URL = "https://api.hyperliquid.xyz/info"
 WATCHLIST_PATH = Path(__file__).parent.parent / "data" / "whales-hl.json"
 
+# Per-venue watchlists. Each watchlist is a JSON array of {wallet, label, source, ...}.
+# HL watchlist preserves the historic flat-array contract (no venue field needed).
+WATCHLISTS: dict[str, Path] = {
+    "hl": Path(__file__).parent.parent / "data" / "whales-hl.json",
+    "drift": Path(__file__).parent.parent / "data" / "whales-drift.json",
+}
+
 
 @dataclass
 class WhalePosition:
@@ -94,6 +101,45 @@ async def fetch_all_whales() -> list[WhalePosition]:
         assert isinstance(state, dict)
         positions.extend(parse_positions(entry["wallet"], state))
     return positions
+
+
+# ---------------------------------------------------------------------------
+# Multi-venue extension. HL path above is unchanged; Drift is stubbed.
+# ---------------------------------------------------------------------------
+
+async def fetch_drift_positions() -> list[WhalePosition]:
+    """
+    Read Drift maker positions. STUB — returns empty list until a Drift fetcher lands.
+
+    Real implementation will hit https://dlob.drift.trade/users/{wallet}/positions
+    (or the corresponding @drift-labs/sdk RPC call) and map to WhalePosition.
+    Drift uses Solana base58 wallet IDs, not 0x EVM addresses, so this path
+    cannot share fetch_clearinghouse_state.
+    """
+    return []
+
+
+async def fetch_positions(venue: str) -> list[WhalePosition]:
+    """Dispatch to the right venue reader. Unknown venues raise."""
+    if venue == "hl":
+        return await fetch_all_whales()
+    if venue == "drift":
+        return await fetch_drift_positions()
+    raise ValueError(f"Unknown venue: {venue!r}. Known: {sorted(WATCHLISTS)}")
+
+
+async def fetch_all_venues(venues: list[str] | None = None) -> list[WhalePosition]:
+    """Read every configured venue concurrently and merge positions."""
+    venues = venues or list(WATCHLISTS)
+    results = await asyncio.gather(*(fetch_positions(v) for v in venues), return_exceptions=True)
+    out: list[WhalePosition] = []
+    for venue, result in zip(venues, results):
+        if isinstance(result, BaseException):
+            print(f"WARN: {venue} venue failed: {result}")
+            continue
+        assert isinstance(result, list)
+        out.extend(result)
+    return out
 
 
 if __name__ == "__main__":

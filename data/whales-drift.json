@@ -1,0 +1,26 @@
+[
+  {
+    "wallet": "DTr3Ww1QwyzC1Yp9PvqsQ9wM8N4dKjxZ4f8m1Y3HhMpJ",
+    "label": "Drift maker 1",
+    "venue": "drift",
+    "source": "dlob.drift.trade/topMakers (manual capture pending)",
+    "last_verified": "2026-05-17",
+    "_notes": "Placeholder Solana address. Replace with curated picks from Drift top-makers ranking before deploy. Wallet format: base58 Solana, not 0x EVM."
+  },
+  {
+    "wallet": "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM",
+    "label": "Drift maker 2",
+    "venue": "drift",
+    "source": "dlob.drift.trade/topMakers (manual capture pending)",
+    "last_verified": "2026-05-17",
+    "_notes": "Placeholder Solana address. Replace before deploy."
+  },
+  {
+    "wallet": "5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1",
+    "label": "Drift maker 3",
+    "venue": "drift",
+    "source": "dlob.drift.trade/topMakers (manual capture pending)",
+    "last_verified": "2026-05-17",
+    "_notes": "Placeholder Solana address. Replace before deploy."
+  }
+]
