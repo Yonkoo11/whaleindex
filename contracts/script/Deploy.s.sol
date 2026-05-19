@@ -21,8 +21,9 @@ contract DeployScript is Script {
 
     function run() external {
         uint256 deployerKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
-        address operator   = vm.envAddress("OPERATOR_ADDRESS");
         address deployer   = vm.addr(deployerKey);
+        // If OPERATOR_ADDRESS isn't set, default to the deployer (single-key setup).
+        address operator   = vm.envOr("OPERATOR_ADDRESS", deployer);
 
         vm.startBroadcast(deployerKey);
 
