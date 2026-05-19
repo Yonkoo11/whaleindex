@@ -23,8 +23,15 @@ set -euo pipefail
 source "$HOME/.zshenv" >/dev/null 2>&1 || true
 
 # Alias common name variants so a single user-chosen name works.
+# $RPC is what `arc-canteen login` sets in ~/.arc-canteen/env (auto-loaded via shell-init).
 : "${DEPLOYER_PRIVATE_KEY:=${FAKTORY_PRIVATE_KEY:-}}"
-: "${ARC_RPC_URL:=${ARC_TESTNET_RPC:-${ARC_RPC:-}}}"
+: "${ARC_RPC_URL:=${RPC:-${ARC_TESTNET_RPC:-${ARC_RPC:-}}}}"
+# Also try ~/.arc-canteen/env directly if shell-init wasn't run yet.
+if [[ -z "${ARC_RPC_URL:-}" && -f "$HOME/.arc-canteen/env" ]]; then
+  # shellcheck disable=SC1091
+  source "$HOME/.arc-canteen/env" >/dev/null 2>&1 || true
+  : "${ARC_RPC_URL:=${RPC:-}}"
+fi
 export DEPLOYER_PRIVATE_KEY ARC_RPC_URL
 
 # Validate presence by length only.
