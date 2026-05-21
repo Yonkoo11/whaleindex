@@ -77,7 +77,8 @@ forge script script/Deploy.s.sol \
   --rpc-url "$ARC_RPC_URL" \
   --broadcast \
   --slow \
-  --silent \
+  --skip-simulation \
+  -vvv \
   2>&1 | tee "$tmp"
 status=${pipestatus[1]}
 
