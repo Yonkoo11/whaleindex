@@ -1,0 +1,64 @@
+{
+  "_meta": {
+    "network": "arc-testnet",
+    "chain_id": 5042002,
+    "rpc": "https://rpc.testnet.arc-node.thecanteenapp.com/v1/<arc-canteen-token>",
+    "explorer": "https://testnet.arcscan.app",
+    "deployed_at": "2026-05-21",
+    "deployer": "0xf9946775891a24462cD4ec885d0D4E2675C84355",
+    "operator": "0xf9946775891a24462cD4ec885d0D4E2675C84355",
+    "deploy_tx_run": "contracts/broadcast/Deploy.s.sol/5042002/run-latest.json",
+    "deploy_gas_used_total": 8994964,
+    "deploy_cost_usdc_approx": 0.179914724587057064,
+    "note": "Phase-1 stack on Arc testnet. USDC/USYC/TokenMessenger are still MOCKS — swap for canonical Arc addresses below in next deploy round once smoke test passes against this set.",
+    "canonical_arc_addresses_for_v2": {
+      "USDC_native_iface": "0x3600000000000000000000000000000000000000",
+      "TokenMessengerV2_CCTP": "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA",
+      "GatewayWallet": "0x0077777d7EBA4688BDeF3E311b846F25870A19B9",
+      "GatewayMinter": "0x0022222ABE238Cc2C7Bb1f21003F0a260052475B",
+      "USYC": "0xe9185F0c5F296Ed1797AaE4238D26CCaBEadb86C",
+      "USYC_Teller": "0x9fdF14c5B14173D74C08Af27AebFf39240dC105A"
+    }
+  },
+  "addresses": {
+    "USDC": "0xf35bE6FFEBF91AcC27A78696cf912595C6b08AAA",
+    "USYC": "0xd2cad31A080b0daE98d9d6427e500B50bCb92774",
+    "TokenMessenger": "0xeC5BfEe9d17e25cc8D52b8cB7fB81D8CaBb53c5f",
+    "NAVOracle": "0xEde6Db2855BACF191E5B2E2d91B6276bB56bf183",
+    "CCTPRouter": "0xD0db0eb608107862E963737FE87ffdFF7f400e3C",
+    "USYCParkVault": "0xf9e5a9E147856D9B26aB04202D79C2c3dA4a326B",
+    "IndexToken": "0xb8F4546e24e437779bC09c3b70ce70Ff9542bdD4",
+    "RebalanceExecutor": "0x9A6d36A0487EA52df43E7704a97F47844C4Eac4E"
+  },
+  "verification": {
+    "bytecode_size_bytes": {
+      "USDC": 3733,
+      "USYC": 6031,
+      "TokenMessenger": 2045,
+      "NAVOracle": 2364,
+      "CCTPRouter": 4598,
+      "USYCParkVault": 4517,
+      "IndexToken": 8094,
+      "RebalanceExecutor": 5667
+    },
+    "ownership": {
+      "IndexToken.owner": "0x9A6d36A0487EA52df43E7704a97F47844C4Eac4E",
+      "USYCParkVault.owner": "0x9A6d36A0487EA52df43E7704a97F47844C4Eac4E",
+      "NAVOracle.owner": "0x9A6d36A0487EA52df43E7704a97F47844C4Eac4E",
+      "NAVOracle.transfer_tx": "0x7140651a288e339e062811111a6250c90d0a46d5f30025a1c7c69cf6d63bc3a8"
+    },
+    "phase1_gate": {
+      "status": "PASS",
+      "rebalance_tx": "0x7dc114d7c5b42d8130542c37174c47d7a98f30ead1855651953bfd5c7c97cd69",
+      "settlement_latency_seconds": 0.78,
+      "settlement_target_seconds": 2.0,
+      "nav_before_usdc": 0,
+      "nav_after_usdc": 15000000,
+      "usdc_routed_to_arbitrum": 5000000,
+      "cctp_v2_nonce": 1,
+      "rebalance_gas_used": 363901,
+      "verified_at": "2026-05-23"
+    },
+    "verified_at": "2026-05-23"
+  }
+}

@@ -80,7 +80,7 @@ forge script script/Deploy.s.sol \
   --skip-simulation \
   -vvv \
   2>&1 | tee "$tmp"
-status=${pipestatus[1]}
+forge_status=${pipestatus[1]}
 
 # Paranoia: scan output for anything that looks like a 64-hex private key.
 # Tx hashes are also 0x + 64 hex, so we filter those out (they're prefixed
@@ -97,9 +97,9 @@ if [[ -n "$leak" ]]; then
   exit 3
 fi
 
-if (( status != 0 )); then
-  echo "Deploy failed (forge exit $status). Check the output above."
-  exit "$status"
+if (( forge_status != 0 )); then
+  echo "Deploy failed (forge exit $forge_status). Check the output above."
+  exit "$forge_status"
 fi
 
 echo

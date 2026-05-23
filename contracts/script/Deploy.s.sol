@@ -59,8 +59,12 @@ contract DeployScript is Script {
         index.transferOwnership(address(exec));
         park.transferOwnership(address(exec));
 
-        // NAVOracle currently owned by `operator`; operator transfers ownership separately
-        // via a tx after deployment, since we can't impersonate the operator from this script.
+        // NAVOracle: in the single-key setup (operator == deployer), we can transfer
+        // its ownership in the same broadcast. In the two-key setup, the operator
+        // must run nav.transferOwnership(address(exec)) themselves after deploy.
+        if (operator == deployer) {
+            nav.transferOwnership(address(exec));
+        }
 
         vm.stopBroadcast();
 

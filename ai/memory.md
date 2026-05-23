@@ -23,20 +23,32 @@
 - Demo video (Phase 4)
 - Builder-code monetization layer (V2 stretch)
 
-**Status:** [partial] Local end-to-end proven on anvil (agent -> RebalanceExecutor -> CCTPRouter + NAVOracle); UI page reads NAV + last Routed event. NOT YET on Arc testnet — blocked on ARC CLI install + DEPLOYER_PRIVATE_KEY in ~/.zshenv. Whale watchlists are user-curated placeholders (Hyperdash 403 Cloudflare, Drift dlob.drift.trade 503).
+**Status:** [PASS — 2026-05-23] Phase 1 Gate proven on live Arc testnet. Rebalance settles in **0.78s** (target <2s) end-to-end agent → RebalanceExecutor → MockUSDC/USYC/CCTP + NAVOracle on Arc.
 
-**Verified 2026-05-17:**
-- Smoke test `python3 -m agent._smoke_test_local` runs end-to-end against local anvil (chain 31337). Self-seeds treasury. Output: "Moved $5.00 USDC to Arbitrum. Index NAV: $0.00 -> $15.00. Gas used: 363,901."
-- 28 contract tests pass.
+**Verified 2026-05-23 (Arc testnet, chain 5042002):**
+- 8 contracts deployed via `scripts/deploy-arc.sh` (uses `--skip-simulation` because Arc RPC stalls forge's pre-broadcast simulation; real gas estimation still runs server-side at broadcast)
+- Deploy cost: 8,994,964 gas (~0.18 USDC)
+- Bytecode verified on chain for all 8 addresses (sizes recorded in `deployments/arc-testnet.json`)
+- Ownership wired: IndexToken + USYCParkVault + NAVOracle all owned by RebalanceExecutor (NAVOracle was manual tx `0x71406...3bc3a8`; Deploy.s.sol now patched to auto-transfer when operator == deployer)
+- Smoke test `scripts/smoke-arc.sh` runs end-to-end against Arc: mint, approve, buy, rebalance — all land
+- Rebalance receipt: tx `0x7dc114...c97cd69`, latency **0.78s**, NAV $0 → $15, 5 USDC routed to Arbitrum (CCTP V2 nonce 1), gas 363,901
+
+**Verified 2026-05-17 (still valid):**
+- Local anvil smoke test (`python3 -m agent._smoke_test_local`) end-to-end pass
+- 28 contract tests pass
 - Repo published: github.com/Yonkoo11/whaleindex
-- GitHub Pages enabled from master:/docs -> https://yonkoo11.github.io/whaleindex/ (build queued at 17:25 UTC)
-- Page rendering NOT visually verified (puppeteer Chrome not installed); HTML + ESM CDN + RPC reads sanity-checked only.
+- GitHub Pages: https://yonkoo11.github.io/whaleindex/ (built from master:/docs)
 
-**Next-session unblockers:**
-- User exports DEPLOYER_PRIVATE_KEY + OPERATOR_PRIVATE_KEY into shell from ~/.zshenv (already there)
-- User runs `uv tool install git+https://github.com/the-canteen-dev/ARC-cli`
-- User provides 5-10 real Hyperdash top-PnL wallet addresses (manually since Hyperdash blocks WebFetch)
-- Then: forge script Deploy.s.sol --rpc-url <arc> --broadcast; write deployments/arc-testnet.json; smoke-test against Arc
+**Phase 1 limitations to fix before/during Phase 2:**
+- All on-chain integrations still use MOCKS (MockUSDC, MockUSYC, MockTokenMessengerV2). Real Arc addresses are recorded in `deployments/arc-testnet.json._meta.canonical_arc_addresses_for_v2`. Phase 2 swaps these in.
+- UI page never visually verified against Arc (currently reads local-anvil RPC); needs update to read `arc-testnet.json` addresses + Arc RPC URL.
+- Whale watchlists still user-curated placeholders (Hyperdash 403 / Drift 503 unresolved).
+- Operations: `~/.arc-canteen/env` rotated may invalidate `RPC=`; smoke + deploy scripts handle missing RPC gracefully but rotation step is manual.
+
+**Lesson learned this session:**
+- Forge's pre-broadcast simulation hangs against the Canteen RPC even though every `eth_*` method responds in <2s via curl. `--skip-simulation` is the workaround; gas estimation still happens server-side during broadcast, so failures still surface (saw "gas required exceeds allowance" cleanly before funding).
+- Deploy.s.sol left NAVOracle owned by `operator` to support a two-key (deployer ≠ operator) setup; in the single-key case, `rebalance()` reverts with `OwnableUnauthorizedAccount(RebalanceExecutor)`. Now patched: when `operator == deployer`, the deploy transfers NAV ownership in the same broadcast.
+- `arc-canteen rpc-url` emits status warnings to stdout when its server is unreachable, contaminating downstream scripts. `grep -oE 'https://[^[:space:]]+'` extracts the URL line cleanly.
 
 ---
 
@@ -153,4 +165,4 @@ NO CSS BEFORE PHASE 4. NO landing page polish before Phase 3.
 
 | # | Idea | Hackathon | Date Built | Phase 1 Passed? | Submitted? | Result | Users? | Lesson |
 |---|------|-----------|------------|-----------------|------------|--------|--------|--------|
-| - | WhaleIndex | Agora Agents | 2026-05-?? | TBD | TBD | TBD | TBD | TBD |
+| - | WhaleIndex | Agora Agents | 2026-05-23 | YES (0.78s settlement on Arc) | TBD | TBD | TBD | TBD |
