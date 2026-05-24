@@ -98,7 +98,7 @@ async def _fetch_metrics(wallet: str, window_days: int = 30) -> WhaleMetrics:
 # --- subcommand impls -------------------------------------------------------
 
 def cmd_list(args: argparse.Namespace) -> int:
-    entries = load_watchlist()
+    entries = load_watchlist(WATCHLIST_PATH)
     if not entries:
         print("(watchlist is empty)")
         return 0
@@ -113,7 +113,7 @@ def cmd_list(args: argparse.Namespace) -> int:
 
 def cmd_add(args: argparse.Namespace) -> int:
     addr = _checksum_or_lower(args.address)
-    entries = load_watchlist() if WATCHLIST_PATH.exists() else []
+    entries = load_watchlist(WATCHLIST_PATH) if WATCHLIST_PATH.exists() else []
 
     if any(e.wallet.lower() == addr.lower() for e in entries):
         print(f"already present: {addr}", file=sys.stderr)
@@ -141,25 +141,25 @@ def cmd_add(args: argparse.Namespace) -> int:
             print(f"  WARN: metric fetch failed ({e}); entry added without metrics", file=sys.stderr)
 
     entries.append(entry)
-    save_watchlist(entries)
+    save_watchlist(entries, WATCHLIST_PATH)
     print(f"added {addr} ({entry.label or '(no label)'})")
     return 0
 
 
 def cmd_remove(args: argparse.Namespace) -> int:
     addr = _checksum_or_lower(args.address)
-    entries = load_watchlist()
+    entries = load_watchlist(WATCHLIST_PATH)
     kept = [e for e in entries if e.wallet.lower() != addr.lower()]
     if len(kept) == len(entries):
         print(f"not found: {addr}", file=sys.stderr)
         return 2
-    save_watchlist(kept)
+    save_watchlist(kept, WATCHLIST_PATH)
     print(f"removed {addr}")
     return 0
 
 
 def cmd_refresh_metrics(args: argparse.Namespace) -> int:
-    entries = load_watchlist()
+    entries = load_watchlist(WATCHLIST_PATH)
     targets = entries
     if args.address:
         addr = _checksum_or_lower(args.address)
@@ -192,13 +192,13 @@ def cmd_refresh_metrics(args: argparse.Namespace) -> int:
                     print(f"  {e.wallet}  REFRESH FAILED: {ex}", file=sys.stderr)
 
     asyncio.run(_run())
-    save_watchlist(entries)
+    save_watchlist(entries, WATCHLIST_PATH)
     print(f"refreshed {len(targets)} whales")
     return 0
 
 
 def cmd_validate(args: argparse.Namespace) -> int:
-    entries = load_watchlist()
+    entries = load_watchlist(WATCHLIST_PATH)
     bad = []
     for e in entries:
         if not EVM_ADDRESS_RE.match(e.wallet):
@@ -222,10 +222,108 @@ def cmd_validate(args: argparse.Namespace) -> int:
 
 def cmd_migrate(args: argparse.Namespace) -> int:
     """Load + save: forces V1 → V2 conversion (or no-op if already V2)."""
-    entries = load_watchlist()
-    save_watchlist(entries)
+    entries = load_watchlist(WATCHLIST_PATH)
+    save_watchlist(entries, WATCHLIST_PATH)
     print(f"migrated {len(entries)} whales to v2 layout at {WATCHLIST_PATH}")
     return 0
+
+
+# Matches 0x-prefixed EVM addresses anywhere in a line. Used by import-urls
+# to extract a wallet from a Hyperdash trader URL like:
+#   https://hyperdash.info/trader/0xFef0a25EE2cE15E8B5DD8E5DD6F0e29e6f76EeBd
+_ADDR_IN_LINE_RE = re.compile(r"0x[a-fA-F0-9]{40}")
+
+
+def cmd_import_urls(args: argparse.Namespace) -> int:
+    """
+    Bulk-add whales from a text file containing Hyperdash URLs (one per line).
+
+    Each line is parsed for an EVM address. Blank lines + lines beginning
+    with '#' are skipped (so curators can annotate the file). When an
+    address is found, the whole line becomes the source URL and the label
+    is auto-derived from the URL's slug (or 'HL whale N' as a fallback).
+
+    Default behavior is conservative: skip duplicates, skip lines without
+    an address, refresh metrics for every successful add (unless
+    --skip-refresh). Pass --label-prefix to control the auto-label.
+
+    Example file (data/whales-import.txt):
+        # top-10 by 30d Sharpe captured 2026-05-24
+        https://hyperdash.info/trader/0xFef0a25EE2cE15E8B5DD8E5DD6F0e29e6f76EeBd
+        https://hyperdash.info/trader/0xb01f6c44d28a0a3a1f10c5fde50e80c9b2c19d6f
+        # below this line, addresses captured from asxn.xyz instead
+        0xCcF3d1aCF799bAe67F6e354d685295557cF64761  some inline note
+
+    Usage:
+        python -m agent.whale_curator import-urls data/whales-import.txt
+        python -m agent.whale_curator import-urls list.txt --skip-refresh --label-prefix "Top Sharpe"
+    """
+    path = Path(args.path)
+    if not path.exists():
+        print(f"file not found: {path}", file=sys.stderr)
+        return 2
+
+    existing = load_watchlist(WATCHLIST_PATH) if WATCHLIST_PATH.exists() else []
+    existing_lower = {e.wallet.lower() for e in existing}
+
+    added = 0
+    skipped_dup = 0
+    skipped_no_addr = 0
+    failed = 0
+
+    raw_lines = path.read_text().splitlines()
+    next_idx = len(existing) + 1
+
+    for raw in raw_lines:
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        m = _ADDR_IN_LINE_RE.search(line)
+        if not m:
+            skipped_no_addr += 1
+            continue
+        addr = _checksum_or_lower(m.group(0))
+        if addr.lower() in existing_lower:
+            skipped_dup += 1
+            continue
+
+        source_url = line if line.startswith("http") else ""
+        label = args.label_prefix + f" {next_idx}" if args.label_prefix else f"HL whale {next_idx}"
+
+        entry = WhaleEntry(
+            wallet=addr,
+            label=label,
+            added_at=_utc_today(),
+            added_by=args.added_by or "",
+            sources=[SourceRef(url=source_url, captured_at=_utc_today())] if source_url else [],
+            tags=[t.strip() for t in (args.tags or "").split(",") if t.strip()],
+            notes=args.notes or "",
+        )
+
+        if not args.skip_refresh:
+            try:
+                entry.metrics = asyncio.run(_fetch_metrics(addr, args.window_days))
+                print(f"  + {addr}  pnl_30d=${entry.metrics.pnl_30d_usd:+,.0f}  "
+                      f"sharpe={entry.metrics.sharpe_30d:+.2f}  "
+                      f"win={entry.metrics.win_rate*100:.0f}%  "
+                      f"fills={entry.metrics.fill_count_30d}")
+            except Exception as e:
+                print(f"  + {addr}  (metric fetch failed: {e})", file=sys.stderr)
+                failed += 1
+        else:
+            print(f"  + {addr}  (skipped metric refresh)")
+
+        existing.append(entry)
+        existing_lower.add(addr.lower())
+        added += 1
+        next_idx += 1
+
+    save_watchlist(existing, WATCHLIST_PATH)
+    print()
+    print(f"summary: added={added}  duplicates_skipped={skipped_dup}  "
+          f"no_address_skipped={skipped_no_addr}  metric_failures={failed}")
+    print(f"now watching: {len(existing)} whales total")
+    return 0 if added > 0 else 1
 
 
 def main() -> int:
@@ -260,6 +358,16 @@ def main() -> int:
 
     p_mig = sub.add_parser("migrate", help="rewrite the file in V2 layout")
     p_mig.set_defaults(func=cmd_migrate)
+
+    p_imp = sub.add_parser("import-urls", help="bulk-add whales from a text file of Hyperdash URLs or addresses")
+    p_imp.add_argument("path", help="path to a text file: one URL or address per line, '#' for comments")
+    p_imp.add_argument("--label-prefix", default="", help="auto-label prefix (e.g. 'Top Sharpe'); falls back to 'HL whale N'")
+    p_imp.add_argument("--tags", default="", help="comma-separated tags applied to every imported entry")
+    p_imp.add_argument("--notes", default="", help="free-form notes applied to every imported entry")
+    p_imp.add_argument("--added-by", default="", help="who added it (defaults empty)")
+    p_imp.add_argument("--skip-refresh", action="store_true", help="don't hit HL API per row")
+    p_imp.add_argument("--window-days", type=int, default=30)
+    p_imp.set_defaults(func=cmd_import_urls)
 
     args = p.parse_args()
     return args.func(args)
