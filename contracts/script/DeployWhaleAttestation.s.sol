@@ -20,7 +20,9 @@ contract DeployWhaleAttestationScript is Script {
         address deployer    = vm.addr(deployerKey);
 
         address usdc        = vm.envOr("USDC_ADDRESS", address(0x3600000000000000000000000000000000000000));
-        address beneficiary = vm.envOr("SLASH_BENEFICIARY", address(0x68a8809E118E6C778D199e0Dc7586AC88589b708));
+        // Default to the V3 IndexToken (current live deploy at addresses.IndexToken).
+        // V2 default kept in repo history under v2_legacy_addresses_for_reference.
+        address beneficiary = vm.envOr("SLASH_BENEFICIARY", address(0xAdEa3FaE6011c2D275868d1c1933B37BE7648269));
         uint256 maxSlashBps = vm.envOr("MAX_SLASH_BPS", uint256(5000));
         uint64  cooldown    = uint64(vm.envOr("UNBOND_COOLDOWN_SECS", uint256(7 days)));
         address operator    = vm.envOr("OPERATOR_ADDRESS", deployer);

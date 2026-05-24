@@ -1,0 +1,14 @@
+{
+  "current_rank": 4,
+  "decay_places": 3,
+  "kind": "slash_evidence",
+  "policy": "decay_severity_to_slash_bps: <=1 places -> 0, 2-3 -> 500, 4-5 -> 1500, 6-10 -> 3000, 11+ -> max_slash_bps",
+  "prior_rank": 1,
+  "reason": "DEMO: operator-as-whale slash test; decay 3 places past threshold",
+  "slash_bps": 1000,
+  "slash_bps_cap": 5000,
+  "snapshot_at": 1779640194,
+  "snapshot_iso": "2026-05-24T16:29:54Z",
+  "version": 1,
+  "wallet": "0xf9946775891a24462cD4ec885d0D4E2675C84355"
+}

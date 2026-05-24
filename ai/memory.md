@@ -25,6 +25,18 @@
 
 **Status:** [V2 PASS — 2026-05-23] Phase 1 Gate proven on Arc with REAL native USDC + new safety primitives. Rebalance settles in **1.08s** (target <2s). 47 forge tests pass (up from 28).
 
+**Verified 2026-05-24 (V3 slash mechanism LIVE on chain + Arcscan verify):**
+- **First live slash on Arc.** End-to-end V3 flow proven:
+  - setRegisteredWhale: tx `0x179c8b8eff49c2853360aa9784cfb87218d63daf222df959cbec88e801453607` (48k gas, WhaleRegistered event)
+  - bond(0.05 USDC): tx `0x8782b216582998cb958d031f1c8f0238f61369303ad6280d1dd85b0c35a5eaff` (97k gas, Bonded event)
+  - slash(operator, 1000 bps, evidenceCid): tx `0x91baecea4db62c947499722c2fb8de0373ec323427d7fe2d3c710046437cdf99` (77k gas, Slashed event)
+  - Bond went 50,000 → 45,000 (10% slashed exactly). 5,000 USDC routed to slashBeneficiary.
+  - Evidence doc: `docs/slashes/1a25fa49aa20279c142d27c31a5e1a9b507150c4c0a1e5acaa4ee233288c73ee.json`, public at https://yonkoo11.github.io/whaleindex/slashes/1a25fa49...c73ee.json after next push
+- **Repointed slashBeneficiary** from default V2 IndexToken to live V3 IndexToken: tx `0x531e5f34ac2f6643327ac98c678b3695475b95906d7c9602b57b4c10d012cb41`. Future slashes credit V3 holders, not stranded V2.
+- **All V3 contracts verified on Arcscan**: NAVOracle, USYCParkVault, IndexToken, RebalanceExecutor, WhaleAttestation. MockTokenMessengerV2 + MockUSYC + CCTPRouter inherit V2's verification (identical source).
+- DeployWhaleAttestation default updated to V3 IndexToken so future deploys don't need the repoint step.
+- The orchestrator's Step 3.5 now wires the slash flow: when rank-decay evicts a bonded whale, the orchestrator publishes the slash evidence doc + calls `attestation.slash(wallet, slashBps, cid)`. 50/50 pytest covers the bonded → slash_pending promotion + the adapter-failure fallback.
+
 **Verified 2026-05-24 (V3 deploy + live off-chain CCTP burn + WhaleAttestation):**
 - **V3 stack deployed** with all post-V2 contract upgrades on Arc (NAV bounds, Pausable, AllocationDecided event, prepareRebalance/commitRebalance for off-chain CCTP, nonReentrant on all entry points, park-return-value check). Addresses in `deployments/arc-testnet.json.addresses` (V2 preserved under `v2_legacy_addresses_for_reference`).
 - **WhaleAttestation V3 live:** `0x1d2d34D941b13CbF233051074F007ecf68fB0F7f`. usdc=real native, slashBeneficiary=V3 IndexToken, maxSlashBps=5000 (50%), unbondCooldown=7 days. 21 forge tests cover bond/slash/unbond + the anti-front-run cooldown-resistant slashing invariant.
