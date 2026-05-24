@@ -1,0 +1,38 @@
+{
+  "allocations": [
+    {
+      "coin": "BTC",
+      "direction": "long",
+      "rationale": "DEMO synthetic \u2014 no real whale data available (placeholders only)",
+      "target_notional_usd": 0.3
+    }
+  ],
+  "aum_usdc": 0.3,
+  "limitations": [
+    "Realised PnL only (no unrealised). A whale with large open winning trades is undervalued.",
+    "Equal-weight across top-N coins is a heuristic, not risk-adjusted.",
+    "Direction-as-sign-of-aggregate ignores cross-whale correlation."
+  ],
+  "method": "realised PnL ranking over window -> rank-decay filter (threshold 2 places) -> top-N coins by aggregate signed notional from survivors -> equal weight",
+  "pnl_window_days": 30,
+  "snapshot_at": 1779618642,
+  "snapshot_iso": "2026-05-24T10:30:42Z",
+  "version": 1,
+  "whales": [
+    {
+      "open_position_count": 0,
+      "realised_pnl_usd_window": 0.0,
+      "wallet": "0x9A89e02b0b6F1aaF6c5dC8B69D6e7Ad1eF1Cf671"
+    },
+    {
+      "open_position_count": 0,
+      "realised_pnl_usd_window": 0.0,
+      "wallet": "0xCcF3d1aCF799bAe67F6e354d685295557cF64761"
+    },
+    {
+      "open_position_count": 0,
+      "realised_pnl_usd_window": 0.0,
+      "wallet": "0x2068F22b91dF98AB3a04D67BC2A2B4C8c5cF3D1E"
+    }
+  ]
+}

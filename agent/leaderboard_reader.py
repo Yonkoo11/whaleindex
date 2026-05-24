@@ -54,6 +54,58 @@ async def fetch_clearinghouse_state(client: httpx.AsyncClient, wallet: str) -> d
     return resp.json()
 
 
+async def fetch_pnl_window(
+    client: httpx.AsyncClient,
+    wallet: str,
+    window_days: int = 30,
+) -> float:
+    """
+    Realised PnL over the trailing `window_days` for one wallet, in USD.
+
+    Uses Hyperliquid's userFillsByTime endpoint. Each fill carries `closedPnl`
+    (the realised PnL booked by that specific fill — partial closes, full closes,
+    funding adjustments). Summing closedPnl across fills in the window gives
+    realised PnL for that period.
+
+    Reference: https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint
+    """
+    now_ms = int(time.time() * 1000)
+    start_ms = now_ms - window_days * 86_400 * 1000
+    body = {
+        "type": "userFillsByTime",
+        "user": wallet,
+        "startTime": start_ms,
+        "endTime": now_ms,
+        "aggregateByTime": False,
+    }
+    resp = await client.post(HL_INFO_URL, json=body, timeout=15.0)
+    resp.raise_for_status()
+    fills = resp.json()
+    if not isinstance(fills, list):
+        return 0.0
+    return sum(float(f.get("closedPnl", "0") or "0") for f in fills)
+
+
+async def fetch_pnl_window_all(
+    wallets: list[str],
+    window_days: int = 30,
+) -> dict[str, float]:
+    """Concurrent realised-PnL fetch for every wallet. Returns {wallet: pnl_usd}."""
+    async with httpx.AsyncClient() as client:
+        results = await asyncio.gather(
+            *(fetch_pnl_window(client, w, window_days) for w in wallets),
+            return_exceptions=True,
+        )
+    out: dict[str, float] = {}
+    for wallet, r in zip(wallets, results):
+        if isinstance(r, BaseException):
+            print(f"WARN: PnL fetch failed for {wallet}: {r}")
+            out[wallet] = 0.0
+        else:
+            out[wallet] = float(r)
+    return out
+
+
 def parse_positions(wallet: str, state: dict[str, Any]) -> list[WhalePosition]:
     """Extract structured positions from a clearinghouseState response."""
     out: list[WhalePosition] = []

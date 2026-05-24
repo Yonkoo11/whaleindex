@@ -20,7 +20,10 @@ heuristic, not a statistical estimator. State the limitation in the README.
 
 from dataclasses import dataclass
 
-from leaderboard_reader import WhalePosition
+try:
+    from agent.leaderboard_reader import WhalePosition
+except ImportError:
+    from leaderboard_reader import WhalePosition  # script-style invocation
 
 
 @dataclass
