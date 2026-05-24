@@ -87,6 +87,10 @@ contract IndexToken is ERC20, Ownable, ReentrancyGuard, Pausable {
         usdc.safeTransfer(to, amount);
     }
 
+    /// Display-only NAV-per-share. Intentionally ignores the `fresh` flag from
+    /// getNAV — buy/redeem enforce freshness directly (they revert on stale NAV)
+    /// and any UI reading sharePrice should also read NAVOracle.isFresh() to
+    /// decide whether to surface a stale-data warning to the user.
     function sharePrice() external view returns (uint256) {
         uint256 supply = totalSupply();
         if (supply == 0) return 1e6; // initial price = 1 USDC per share (6 decimals)

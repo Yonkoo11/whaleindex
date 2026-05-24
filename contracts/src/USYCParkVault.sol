@@ -35,6 +35,10 @@ contract USYCParkVault is Ownable {
     }
 
     /// USDC-denominated value of vault holdings (idle + USYC shares marked to current rate).
+    /// The `shares == 0` strict-equality is intentional: it's a sentinel guard against
+    /// calling `convertToAssets(0)` on USYC implementations that revert on zero input.
+    /// (Slither's `incorrect-equality` detector flags any `==` comparison, but the
+    /// danger pattern it's looking for is time / address equality, not uint256-zero sentinels.)
     function balanceUSDC() external view returns (uint256) {
         uint256 idle = usdc.balanceOf(address(this));
         uint256 shares = usyc.balanceOf(address(this));

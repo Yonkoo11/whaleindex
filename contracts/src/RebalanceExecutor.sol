@@ -5,6 +5,7 @@ import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import {Pausable} from "openzeppelin-contracts/contracts/utils/Pausable.sol";
+import {ReentrancyGuard} from "openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 import {IndexToken} from "./IndexToken.sol";
 import {NAVOracle} from "./NAVOracle.sol";
 import {CCTPRouter} from "./CCTPRouter.sol";
@@ -15,7 +16,7 @@ import {USYCParkVault} from "./USYCParkVault.sol";
 /// Emits AllocationDecided(cid) so the off-chain allocation decision (whale list + weights,
 /// pinned to IPFS) is anchored to every on-chain rebalance.
 /// V1 ownership = single operator agent. V2 = 2/3 multisig.
-contract RebalanceExecutor is Ownable, Pausable {
+contract RebalanceExecutor is Ownable, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     IERC20         public immutable usdc;
@@ -99,6 +100,7 @@ contract RebalanceExecutor is Ownable, Pausable {
     error MissingAllocationCID();
     error UnknownBurnId();
     error AlreadyCommitted();
+    error ParkReturnedZeroShares();
 
     constructor(
         address usdc_,
@@ -144,7 +146,7 @@ contract RebalanceExecutor is Ownable, Pausable {
         uint64  reportedAt,
         bytes32 allocationCid,
         uint16  whaleCount
-    ) external onlyOwner whenNotPaused returns (uint64 cctpNonce) {
+    ) external onlyOwner whenNotPaused nonReentrant returns (uint64 cctpNonce) {
         if (allocationCid == bytes32(0)) revert MissingAllocationCID();
         emit AllocationDecided(allocationCid, whaleCount, reportedAt);
 
@@ -153,10 +155,12 @@ contract RebalanceExecutor is Ownable, Pausable {
         // Pull USDC from index treasury into this executor.
         index.withdrawForRebalance(address(this), totalUsdcAmount);
 
-        // Park residual idle USDC in USYC for yield.
+        // Park residual idle USDC in USYC for yield. Park returns the share
+        // count minted; zero shares for a non-zero deposit is a vault misbehaviour
+        // (e.g., USYC paused mid-tx) and must abort the whole rebalance.
         if (parkAmount > 0) {
             usdc.forceApprove(address(park), parkAmount);
-            park.park(parkAmount);
+            if (park.park(parkAmount) == 0) revert ParkReturnedZeroShares();
         }
 
         // Route the remaining USDC via CCTP V2.
@@ -216,29 +220,18 @@ contract RebalanceExecutor is Ownable, Pausable {
         uint32  minFinalityThreshold,
         bytes32 allocationCid,
         uint16  whaleCount
-    ) external onlyOwner whenNotPaused returns (uint256 burnId) {
+    ) external onlyOwner whenNotPaused nonReentrant returns (uint256 burnId) {
         if (allocationCid == bytes32(0)) revert MissingAllocationCID();
         emit AllocationDecided(allocationCid, whaleCount, uint64(block.timestamp));
 
         _checkAndAccrue(totalUsdcAmount);
 
-        // Pull USDC from index into this executor.
-        index.withdrawForRebalance(address(this), totalUsdcAmount);
-
-        // Park residual idle USDC in USYC for yield (same path as one-shot rebalance).
-        if (parkAmount > 0) {
-            usdc.forceApprove(address(park), parkAmount);
-            park.park(parkAmount);
-        }
-
-        uint256 routeAmount = totalUsdcAmount - parkAmount;
-        if (routeAmount > 0) {
-            // Transfer routing USDC to the operator EOA. From here, the operator
-            // signs depositForBurn directly against the real CCTP TokenMessenger.
-            usdc.safeTransfer(msg.sender, routeAmount);
-        }
-
+        // Reserve the burnId + write the staged burn BEFORE the external calls
+        // so a (theoretically) malicious USDC implementation that reentered
+        // can't grab the same burnId twice. Belt-and-suspenders alongside the
+        // nonReentrant modifier above.
         burnId = ++nextBurnId;
+        uint256 routeAmount = totalUsdcAmount - parkAmount;
         preparedBurns[burnId] = PreparedBurn({
             amount: routeAmount,
             destinationDomain: destinationDomain,
@@ -248,6 +241,22 @@ contract RebalanceExecutor is Ownable, Pausable {
             allocationCid: allocationCid,
             committed: false
         });
+
+        // Pull USDC from index into this executor.
+        index.withdrawForRebalance(address(this), totalUsdcAmount);
+
+        // Park residual idle USDC in USYC for yield (same path + same return-value
+        // check as one-shot rebalance).
+        if (parkAmount > 0) {
+            usdc.forceApprove(address(park), parkAmount);
+            if (park.park(parkAmount) == 0) revert ParkReturnedZeroShares();
+        }
+
+        if (routeAmount > 0) {
+            // Transfer routing USDC to the operator EOA. From here, the operator
+            // signs depositForBurn directly against the real CCTP TokenMessenger.
+            usdc.safeTransfer(msg.sender, routeAmount);
+        }
 
         emit BurnPrepared(
             burnId,
@@ -269,7 +278,7 @@ contract RebalanceExecutor is Ownable, Pausable {
         uint64  cctpNonce,
         uint256 newNav,
         uint64  reportedAt
-    ) external onlyOwner whenNotPaused {
+    ) external onlyOwner whenNotPaused nonReentrant {
         PreparedBurn storage p = preparedBurns[burnId];
         if (p.allocationCid == bytes32(0)) revert UnknownBurnId();
         if (p.committed) revert AlreadyCommitted();
