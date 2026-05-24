@@ -62,3 +62,8 @@ jobs:
 
       - name: Sanity-check orchestrator argparse
         run: python -m agent.orchestrator --help
+
+      - name: pytest agent unit tests
+        run: |
+          pip install pytest
+          python -m pytest agent/tests -v

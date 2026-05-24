@@ -1,8 +1,20 @@
 # WhaleIndex V1 — Senior Build Plan
 
-**Authored:** 2026-05-23
+**Authored:** 2026-05-23, autonomous Phase A added 2026-05-24
 **Constraint:** time-unconstrained, build to a senior Arc developer's quality bar
 **Supersedes:** the 10-hour priority list at the bottom of the prior critique
+
+---
+
+## Autonomous Phase A (2026-05-24) — in progress
+
+User opted into Option 1 (keep building) with no time constraint. Building three pieces in sequence, save point after each:
+
+1. **T1.1 — Whale list schema + ingestion harness.** Curation tool so adding a whale is `agent.whale_curator add 0x... --label ...`, not hand-edit JSON. Computed metrics auto-attached. Schema versioned, backward-compatible with V1 flat-array format. Tests.
+2. **T2.7 — Multi-agent decomposition.** Replace the monolithic allocation flow with four cooperating agents: Scorer (per-whale composite metric), Allocator (proposal slate: equal / score-weighted / Kelly-bounded), Risk (veto on concentration, drawdown, leverage), Coordinator (resolves votes, signs final decision). Allocation document records each agent's vote with reasoning.
+3. **T1.2 — CCTP off-chain orchestration.** Two-phase rebalance: `prepareRebalance` pulls USDC + emits BurnPrepared, operator EOA signs the real CCTP `depositForBurn`, then `commitRebalance` updates NAV with the actual nonce. Sidesteps the Arc contract-caller gate. Real CCTP V2 burns from this point forward.
+
+Each piece ends with green forge tests + green orchestrator import-check + a save point.
 
 ---
 

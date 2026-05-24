@@ -14,7 +14,6 @@ https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint
 """
 
 import asyncio
-import json
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -132,10 +131,20 @@ def parse_positions(wallet: str, state: dict[str, Any]) -> list[WhalePosition]:
 
 
 def load_watchlist() -> list[dict[str, Any]]:
-    """Load the curated whale watchlist."""
-    if not WATCHLIST_PATH.exists():
-        raise FileNotFoundError(f"Watchlist missing: {WATCHLIST_PATH}")
-    return json.loads(WATCHLIST_PATH.read_text())
+    """
+    Load the curated whale watchlist as legacy-shaped dicts.
+
+    Delegates to agent.whale_schema.load_watchlist (which understands both V1
+    and V2 layouts) and renders the result as `[{wallet, label, source,
+    last_verified, _notes}]` so existing consumers don't have to change.
+    """
+    # Import inside function to avoid a circular import (whale_schema imports
+    # nothing from this module, but whale_curator imports from us).
+    from agent.whale_schema import (
+        load_watchlist as _load_typed,
+        watchlist_as_legacy_dicts,
+    )
+    return watchlist_as_legacy_dicts(_load_typed(WATCHLIST_PATH))
 
 
 async def fetch_all_whales() -> list[WhalePosition]:
