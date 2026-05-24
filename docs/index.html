@@ -3,169 +3,408 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>WhaleIndex — Phase 1</title>
+  <meta name="theme-color" content="#0a0e14">
+  <title>WhaleIndex — USDC index on Arc, mirroring HL whales with on-chain provenance</title>
+  <meta name="description" content="A USDC-denominated index on Arc that mirrors top Hyperliquid whales. Every rebalance has an on-chain hash linking to the agent's reasoning. Sub-second settlement.">
+
   <style>
-    :root { color-scheme: dark; }
+    :root {
+      color-scheme: dark;
+      --bg: #0a0e14;
+      --bg-card: #0e131a;
+      --border: #1f2630;
+      --border-hi: #2e3849;
+      --fg: #e6edf3;
+      --fg-dim: #8a95a3;
+      --fg-mute: #6b7785;
+      --accent: #6cd16c;
+      --warn: #d97757;
+      --link: #7cc7ff;
+    }
     * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      padding: 32px 24px;
-      font: 14px/1.5 -apple-system, ui-monospace, SFMono-Regular, Menlo, monospace;
-      color: #d8dee9;
-      background: #0a0e14;
+    html, body {
+      margin: 0; padding: 0;
+      background: var(--bg); color: var(--fg);
+      font: 14px/1.55 -apple-system, ui-monospace, SFMono-Regular, Menlo, monospace;
     }
-    main { max-width: 760px; margin: 0 auto; }
-    h1 { font-size: 18px; margin: 0 0 4px; font-weight: 600; letter-spacing: .02em; }
-    .sub { color: #6b7785; font-size: 12px; margin-bottom: 28px; }
+    a { color: var(--link); text-decoration: none; border-bottom: 1px dotted var(--border-hi); }
+    a:hover { border-bottom-color: var(--link); }
+    main { max-width: 880px; margin: 0 auto; padding: 28px 18px 80px; }
+    .header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+    h1 { font-size: 18px; margin: 0; font-weight: 600; letter-spacing: .02em; }
+    .net-badge {
+      font-size: 11px; padding: 2px 8px; border-radius: 4px;
+      background: #14241a; color: var(--accent); border: 1px solid #1f3a26;
+    }
+    .pitch { color: var(--fg-dim); font-size: 13px; margin: 6px 0 22px; max-width: 640px; }
+    .pitch strong { color: var(--fg); font-weight: 500; }
     .card {
-      border: 1px solid #1f2630;
-      border-radius: 8px;
-      padding: 20px 22px;
-      margin-bottom: 14px;
-      background: #0e131a;
+      border: 1px solid var(--border); border-radius: 8px;
+      padding: 18px 20px; margin-bottom: 12px;
+      background: var(--bg-card);
     }
-    .label { color: #6b7785; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
-    .value { font-size: 22px; font-weight: 500; color: #e6edf3; }
-    .small { font-size: 12px; color: #8a95a3; margin-top: 4px; }
-    .fresh { color: #6cd16c; }
-    .stale { color: #d97757; }
-    .row { display: flex; gap: 24px; flex-wrap: wrap; }
-    .row > div { flex: 1; min-width: 180px; }
-    .controls { display: flex; gap: 10px; margin-bottom: 18px; }
+    .card-title {
+      color: var(--fg-mute); font-size: 11px; text-transform: uppercase;
+      letter-spacing: .08em; margin-bottom: 12px;
+    }
+    .row { display: flex; gap: 22px; flex-wrap: wrap; }
+    .row > div { flex: 1; min-width: 160px; }
+    .label { color: var(--fg-mute); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px; }
+    .value { font-size: 22px; font-weight: 500; color: var(--fg); line-height: 1.2; }
+    .value.big { font-size: 28px; }
+    .small { font-size: 12px; color: var(--fg-dim); margin-top: 4px; word-break: break-all; }
+    .small.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .fresh { color: var(--accent); }
+    .stale { color: var(--warn); }
+    .controls { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
     select, button {
-      background: #161c25; color: #d8dee9; border: 1px solid #1f2630;
-      border-radius: 6px; padding: 7px 12px; font: inherit; cursor: pointer;
+      background: #161c25; color: var(--fg); border: 1px solid var(--border);
+      border-radius: 6px; padding: 6px 12px; font: inherit; cursor: pointer;
     }
-    button:hover, select:hover { border-color: #2e3849; }
-    code { background: #161c25; padding: 1px 6px; border-radius: 4px; font-size: 12px; }
-    .err { color: #d97757; font-size: 12px; margin-top: 4px; word-break: break-all; }
+    button:hover, select:hover { border-color: var(--border-hi); }
+    code { background: #161c25; padding: 1px 6px; border-radius: 4px; font-size: 12px; word-break: break-all; }
+    .err { color: var(--warn); font-size: 12px; margin-top: 6px; word-break: break-all; }
+    .compare-grid {
+      display: grid; gap: 10px;
+      grid-template-columns: repeat(3, 1fr);
+    }
+    .compare {
+      padding: 12px; border: 1px solid var(--border); border-radius: 6px;
+      background: rgba(255,255,255,0.012);
+    }
+    .compare h4 { margin: 0 0 6px; font-size: 12px; font-weight: 600; color: var(--fg); }
+    .compare .stat { font-size: 18px; color: var(--accent); }
+    .compare .stat.dim { color: var(--fg-mute); }
+    .compare .note { font-size: 11px; color: var(--fg-mute); margin-top: 4px; }
+    .addr-list { display: grid; grid-template-columns: 1fr auto; gap: 6px 14px; font-size: 12px; }
+    .addr-list .k { color: var(--fg-mute); }
+    .addr-list .v { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
+    .footer { color: var(--fg-mute); font-size: 11px; margin-top: 24px; text-align: center; line-height: 1.7; }
+    .footer a { color: var(--fg-dim); }
+    @media (max-width: 600px) {
+      main { padding: 20px 14px 60px; }
+      .compare-grid { grid-template-columns: 1fr; }
+      .value.big { font-size: 22px; }
+      .row > div { min-width: 140px; }
+    }
   </style>
 </head>
 <body>
   <main>
-    <h1>WhaleIndex</h1>
-    <div class="sub">Phase 1 — index NAV + most recent rebalance receipt</div>
+    <div class="header">
+      <h1>WhaleIndex</h1>
+      <span class="net-badge" id="net-badge">Arc Testnet</span>
+    </div>
+    <div class="pitch">
+      <strong>A USDC-denominated index on Arc that mirrors top Hyperliquid whales.</strong>
+      Every rebalance posts a content hash on chain that resolves to the agent's reasoning document — provenance, not trust.
+      Settlement under 2 seconds. Cost under a cent.
+    </div>
 
     <div class="controls">
       <select id="network">
-        <option value="local">local anvil</option>
-        <option value="arc-testnet">arc testnet</option>
+        <option value="arc-testnet" selected>arc testnet (V2, live)</option>
+        <option value="local">local anvil (V1 dev)</option>
       </select>
       <button id="refresh">refresh</button>
     </div>
 
     <div class="card">
+      <div class="card-title">Index State</div>
       <div class="row">
         <div>
-          <div class="label">Index NAV (USDC)</div>
-          <div class="value" id="nav">—</div>
-          <div class="small" id="nav-fresh">—</div>
+          <div class="label">NAV (USDC)</div>
+          <div class="value big" id="nav">—</div>
+          <div class="small" id="nav-fresh">loading…</div>
         </div>
         <div>
-          <div class="label">Share price (USDC / WHALE)</div>
+          <div class="label">Share Price (USDC / WHALE)</div>
           <div class="value" id="sp">—</div>
           <div class="small" id="supply">—</div>
+        </div>
+        <div>
+          <div class="label">Max NAV Delta / Update</div>
+          <div class="value" id="maxdelta">—</div>
+          <div class="small">on-chain bound; reverts beyond</div>
         </div>
       </div>
     </div>
 
     <div class="card">
-      <div class="label">Most recent rebalance</div>
-      <div class="value" id="last-move">no rebalance events yet</div>
-      <div class="small" id="last-block">—</div>
-      <div class="small" id="last-tx">—</div>
+      <div class="card-title">Most Recent Rebalance</div>
+      <div class="row">
+        <div>
+          <div class="label">Routed</div>
+          <div class="value" id="last-amount">—</div>
+          <div class="small" id="last-venue">—</div>
+        </div>
+        <div>
+          <div class="label">Settlement Latency</div>
+          <div class="value" id="last-latency">—</div>
+          <div class="small">Arc deterministic finality</div>
+        </div>
+        <div>
+          <div class="label">Gas Cost (USDC)</div>
+          <div class="value" id="last-cost">—</div>
+          <div class="small" id="last-cost-cents">cents</div>
+        </div>
+      </div>
+      <div class="small mono" style="margin-top:14px;">
+        <span class="label" style="display:inline; margin-right:8px;">TX</span>
+        <span id="last-tx-link">—</span>
+      </div>
+      <div class="small mono" style="margin-top:4px;">
+        <span class="label" style="display:inline; margin-right:8px;">REASONING</span>
+        <span id="last-cid-link">—</span>
+      </div>
     </div>
 
     <div class="card">
-      <div class="label">Connection</div>
-      <div class="small" id="conn">connecting…</div>
+      <div class="card-title">Why Arc — Same Rebalance, Different Chains</div>
+      <div class="compare-grid">
+        <div class="compare">
+          <h4>Arc Testnet</h4>
+          <div class="stat" id="arc-compare-latency">~1s</div>
+          <div class="note" id="arc-compare-cost">≈ $0.0005 gas (USDC)</div>
+          <div class="note">Deterministic finality</div>
+        </div>
+        <div class="compare">
+          <h4>Arbitrum One</h4>
+          <div class="stat dim">~2s</div>
+          <div class="note">≈ $0.20-0.30 gas (ETH)</div>
+          <div class="note">7-day fraud window</div>
+        </div>
+        <div class="compare">
+          <h4>Ethereum L1</h4>
+          <div class="stat dim">~12s</div>
+          <div class="note">≈ $4-8 gas (ETH)</div>
+          <div class="note">Probabilistic finality</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Verified Contracts (Arc Testnet)</div>
+      <div class="addr-list" id="addr-list"><div class="k">loading…</div><div class="v"></div></div>
+      <div class="small" style="margin-top:10px;">
+        All 7 contracts have verified source on
+        <a href="https://testnet.arcscan.app" target="_blank" rel="noopener">Arcscan</a>.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Connection</div>
+      <div class="small mono" id="conn">connecting…</div>
       <div class="err" id="err"></div>
+    </div>
+
+    <div class="footer">
+      Source: <a href="https://github.com/Yonkoo11/whaleindex" target="_blank" rel="noopener">github.com/Yonkoo11/whaleindex</a>
+      · Built for the <a href="https://agora.thecanteenapp.com" target="_blank" rel="noopener">Agora Agents Hackathon</a>
+      · MIT licensed
     </div>
   </main>
 
   <script type="module">
-    import { JsonRpcProvider, Contract } from "https://esm.sh/ethers@6.13.4";
+    import { JsonRpcProvider, Contract, formatUnits } from "https://esm.sh/ethers@6.13.4";
 
+    // V2 deployment on Arc testnet (chain 5042002), real native USDC + safety primitives.
+    // RPC: keyless public endpoint so any visitor sees live state without their own canteen token.
     const NETWORKS = {
+      "arc-testnet": {
+        rpc: "https://rpc.testnet.arc.network",
+        rpcFallback: "https://arc-testnet.drpc.org",
+        chainId: 5042002,
+        explorer: "https://testnet.arcscan.app",
+        addresses: {
+          NAVOracle:          "0xcbA2b630051527Cbebdc9212611a059c080B9e1c",
+          IndexToken:         "0x68a8809E118E6C778D199e0Dc7586AC88589b708",
+          RebalanceExecutor:  "0x2096B1FCad5d3d4303f1Ac3DABA4116c73B0D282",
+          CCTPRouter:         "0xC74Efa01142F7BA9e6B96C5c0841DcA0aB744E34",
+          USYCParkVault:      "0xE8682ca1cE90A6be3BD91A01Bf3e39c19543521A",
+          USDC:               "0x3600000000000000000000000000000000000000",
+          TokenMessenger:     "0x60612Ad24e730aBF256cCFDd77dd0F431B20a079",
+          USYC:               "0x86df318Ff4356682Da819516bd05B9873f3b8F07",
+        },
+      },
       "local": {
         rpc: "http://127.0.0.1:8545",
+        chainId: 31337,
+        explorer: "",
         addresses: {
           NAVOracle:  "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
           IndexToken: "0x0165878A594ca255338adfa4d48449f69242Eb8F",
           CCTPRouter: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+          RebalanceExecutor: "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
         },
       },
-      "arc-testnet": { rpc: "", addresses: {} },  // populated after Arc deploy
     };
+
+    const ALLOCATIONS_BASE = "https://yonkoo11.github.io/whaleindex/allocations";
 
     const ABI_NAV = [
       "function nav() view returns (uint256)",
       "function isFresh() view returns (bool)",
       "function updatedAt() view returns (uint64)",
+      "function maxDeltaBps() view returns (uint256)",
     ];
     const ABI_INDEX = [
       "function totalSupply() view returns (uint256)",
       "function sharePrice() view returns (uint256)",
-      "function decimals() view returns (uint8)",
     ];
     const ABI_ROUTER = [
       "event Routed(uint64 indexed nonce, uint32 indexed destinationDomain, bytes32 mintRecipient, uint256 amount, uint256 maxFee, uint32 minFinalityThreshold)",
     ];
+    const ABI_EXEC = [
+      "event AllocationDecided(bytes32 indexed cid, uint16 whaleCount, uint64 reportedAt)",
+    ];
 
     const DOMAINS = {
       0: "Ethereum", 1: "Avalanche", 2: "OP", 3: "Arbitrum",
-      5: "Solana", 6: "Base", 7: "Polygon", 10: "Unichain",
+      5: "Solana", 6: "Base", 7: "Polygon", 10: "Unichain", 26: "Arc Testnet",
     };
 
-    const $ = id => document.getElementById(id);
-    const fmt = (raw, dec) => (Number(raw) / 10 ** dec).toLocaleString(undefined, { maximumFractionDigits: 4 });
+    const $ = (id) => document.getElementById(id);
+    const fmt = (raw, dec, frac = 4) =>
+      Number(formatUnits(raw, dec)).toLocaleString(undefined, { maximumFractionDigits: frac });
+
+    function shortHash(h) { return h.slice(0, 10) + "…" + h.slice(-6); }
+
+    function makeLink(href, text) {
+      const a = document.createElement("a");
+      a.href = href;
+      a.textContent = text;
+      a.target = "_blank";
+      a.rel = "noopener";
+      return a;
+    }
+
+    function setLinkOrText(el, href, text) {
+      el.replaceChildren(href ? makeLink(href, text) : document.createTextNode(text));
+    }
+
+    function populateAddressList(cfg) {
+      const grid = $("addr-list");
+      grid.replaceChildren();
+      for (const [k, v] of Object.entries(cfg.addresses)) {
+        const kDiv = document.createElement("div"); kDiv.className = "k"; kDiv.textContent = k;
+        const vDiv = document.createElement("div"); vDiv.className = "v";
+        if (cfg.explorer) {
+          vDiv.appendChild(makeLink(`${cfg.explorer}/address/${v}`, v));
+        } else {
+          vDiv.textContent = v;
+        }
+        grid.append(kDiv, vDiv);
+      }
+    }
+
+    async function tryProvider(rpc) {
+      const p = new JsonRpcProvider(rpc);
+      try { await p.getBlockNumber(); return p; }
+      catch { return null; }
+    }
 
     async function refresh() {
       const net = $("network").value;
       const cfg = NETWORKS[net];
+      $("net-badge").textContent = net === "arc-testnet" ? "Arc Testnet" : "Local Anvil";
       $("err").textContent = "";
-      $("conn").textContent = `RPC: ${cfg.rpc || "(not configured)"}`;
+      $("conn").textContent = "connecting…";
 
-      if (!cfg.rpc) { $("err").textContent = "no RPC configured for this network"; return; }
-      let provider;
-      try {
-        provider = new JsonRpcProvider(cfg.rpc);
-        const net_ = await provider.getNetwork();
-        $("conn").textContent = `RPC ${cfg.rpc} — chain ${net_.chainId}`;
-      } catch (e) { $("err").textContent = "RPC unreachable: " + e.message; return; }
+      populateAddressList(cfg);
+
+      let provider = await tryProvider(cfg.rpc);
+      if (!provider && cfg.rpcFallback) provider = await tryProvider(cfg.rpcFallback);
+      if (!provider) {
+        $("err").textContent = "Both primary and fallback RPC unreachable.";
+        $("conn").textContent = `RPC unreachable: ${cfg.rpc}`;
+        return;
+      }
+      const network_ = await provider.getNetwork();
+      $("conn").textContent = `RPC ${provider._getConnection().url} — chain ${network_.chainId}`;
 
       try {
         const nav = new Contract(cfg.addresses.NAVOracle, ABI_NAV, provider);
         const idx = new Contract(cfg.addresses.IndexToken, ABI_INDEX, provider);
-        const navUsdc = await nav.nav();
-        const isFresh = await nav.isFresh();
-        const updatedAt = await nav.updatedAt();
-        const supply = await idx.totalSupply();
-        const sp = await idx.sharePrice();
+        const [navUsdc, isFresh, updatedAt, maxDeltaBps, supply, sp] = await Promise.all([
+          nav.nav(), nav.isFresh(), nav.updatedAt(), nav.maxDeltaBps().catch(() => 0n),
+          idx.totalSupply(), idx.sharePrice(),
+        ]);
 
-        $("nav").textContent = "$" + fmt(navUsdc, 6);
-        $("nav-fresh").textContent = isFresh
-          ? "fresh — updated " + new Date(Number(updatedAt) * 1000).toLocaleTimeString()
+        $("nav").textContent = "$" + fmt(navUsdc, 6, 4);
+        const freshEl = $("nav-fresh");
+        freshEl.textContent = isFresh
+          ? "fresh — updated " + new Date(Number(updatedAt) * 1000).toLocaleString()
           : "STALE — last update " + (updatedAt > 0n ? new Date(Number(updatedAt) * 1000).toLocaleString() : "never");
-        $("nav-fresh").className = "small " + (isFresh ? "fresh" : "stale");
-        $("sp").textContent = fmt(sp, 6);
-        $("supply").textContent = "supply: " + fmt(supply, 18) + " WHALE";
+        freshEl.className = "small " + (isFresh ? "fresh" : "stale");
+        $("sp").textContent = "$" + fmt(sp, 6, 4);
+        $("supply").textContent = "supply: " + fmt(supply, 18, 4) + " WHALE";
+        $("maxdelta").textContent = maxDeltaBps ? `±${Number(maxDeltaBps) / 100}%` : "—";
+
+        const latest = await provider.getBlockNumber();
+        // Public RPC limits eth_getLogs to 10K block range. Walk back in 9K chunks
+        // up to ~24h (chunks of 9000 blocks × 10 = 90K ≈ 25h at Arc's 1s blocks).
+        const CHUNK = 9_000;
+        const MAX_CHUNKS = 10;
 
         const router = new Contract(cfg.addresses.CCTPRouter, ABI_ROUTER, provider);
-        const latest = await provider.getBlockNumber();
-        const from = Math.max(0, latest - 5000);
-        const events = await router.queryFilter("Routed", from, latest);
-        const last = events[events.length - 1];
-        if (last) {
-          const domain = Number(last.args.destinationDomain);
-          const venue = DOMAINS[domain] || `domain #${domain}`;
-          $("last-move").textContent = `$${fmt(last.args.amount, 6)} USDC -> ${venue}`;
-          $("last-block").textContent = `block ${last.blockNumber}, CCTP V2 nonce ${last.args.nonce}`;
-          $("last-tx").textContent = `tx ${last.transactionHash.slice(0, 10)}…${last.transactionHash.slice(-6)}`;
+        const exec = cfg.addresses.RebalanceExecutor
+          ? new Contract(cfg.addresses.RebalanceExecutor, ABI_EXEC, provider)
+          : null;
+
+        let lastRouted = null, lastAlloc = null;
+        for (let i = 0; i < MAX_CHUNKS && (!lastRouted || !lastAlloc); i++) {
+          const to = latest - i * CHUNK;
+          const from = Math.max(0, to - CHUNK + 1);
+          const [r, a] = await Promise.all([
+            !lastRouted ? router.queryFilter("Routed", from, to).catch(() => []) : Promise.resolve([]),
+            !lastAlloc && exec ? exec.queryFilter("AllocationDecided", from, to).catch(() => []) : Promise.resolve([]),
+          ]);
+          if (!lastRouted && r.length) lastRouted = r[r.length - 1];
+          if (!lastAlloc && a.length) lastAlloc = a[a.length - 1];
+          if (from === 0) break;
+        }
+
+        if (lastRouted) {
+          const venue = DOMAINS[Number(lastRouted.args.destinationDomain)] || `domain ${lastRouted.args.destinationDomain}`;
+          $("last-amount").textContent = "$" + fmt(lastRouted.args.amount, 6, 4);
+          $("last-venue").textContent = "→ " + venue;
+          const txHash = lastRouted.transactionHash;
+          setLinkOrText($("last-tx-link"), cfg.explorer ? `${cfg.explorer}/tx/${txHash}` : "", shortHash(txHash));
+
+          const rcpt = await provider.getTransactionReceipt(txHash);
+          if (rcpt) {
+            const gasNative = rcpt.gasUsed * rcpt.gasPrice; // 18-dec native USDC
+            const usdcCost = Number(formatUnits(gasNative, 18));
+            $("last-cost").textContent = "$" + usdcCost.toFixed(6);
+            $("last-cost-cents").textContent = (usdcCost * 100).toFixed(3) + "¢";
+            $("arc-compare-cost").textContent = "≈ $" + usdcCost.toFixed(4) + " gas (USDC)";
+          }
         } else {
-          $("last-move").textContent = "no rebalance events in last 5000 blocks";
-          $("last-block").textContent = "—";
-          $("last-tx").textContent = "—";
+          $("last-amount").textContent = "no recent rebalances";
+          $("last-venue").textContent = "(searched last ~24h)";
+        }
+
+        if (lastAlloc) {
+          const cidHex = lastAlloc.args.cid;
+          const cidStr = cidHex.startsWith("0x") ? cidHex.slice(2) : cidHex;
+          setLinkOrText($("last-cid-link"), `${ALLOCATIONS_BASE}/${cidStr}.json`, `cid ${cidHex.slice(0, 14)}…`);
+        } else {
+          $("last-cid-link").textContent = "no AllocationDecided event in window";
+        }
+
+        if (lastRouted) {
+          const recentBlocks = await Promise.all([
+            provider.getBlock(latest),
+            provider.getBlock(Math.max(0, latest - 5)),
+          ]);
+          if (recentBlocks[0] && recentBlocks[1]) {
+            const dt = recentBlocks[0].timestamp - recentBlocks[1].timestamp;
+            const perBlockSec = dt / 5;
+            $("last-latency").textContent = `${perBlockSec.toFixed(2)}s`;
+            $("last-latency").className = "value fresh";
+            $("arc-compare-latency").textContent = `~${perBlockSec.toFixed(1)}s`;
+          }
         }
       } catch (e) {
         $("err").textContent = "read failed: " + (e.shortMessage || e.message);
@@ -175,7 +414,7 @@
     $("refresh").addEventListener("click", refresh);
     $("network").addEventListener("change", refresh);
     refresh();
-    setInterval(refresh, 8000);
+    setInterval(refresh, 15000);
   </script>
 </body>
 </html>
