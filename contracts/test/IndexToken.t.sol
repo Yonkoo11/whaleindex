@@ -125,4 +125,49 @@ contract IndexTokenTest is Test {
     function test_sharePrice_initial() public view {
         assertEq(index.sharePrice(), 1e6);
     }
+
+    // --- pause behaviour ---
+
+    function test_pause_blocksBuy() public {
+        index.pause();
+        vm.startPrank(alice);
+        usdc.approve(address(index), 100_000_000);
+        vm.expectRevert(); // Pausable: EnforcedPause()
+        index.buy(100_000_000);
+        vm.stopPrank();
+    }
+
+    function test_pause_blocksRedeem() public {
+        vm.startPrank(alice);
+        usdc.approve(address(index), 100_000_000);
+        uint256 shares = index.buy(100_000_000);
+        vm.stopPrank();
+
+        index.pause();
+        vm.prank(alice);
+        vm.expectRevert();
+        index.redeem(shares);
+    }
+
+    function test_pause_blocksWithdrawForRebalance() public {
+        index.pause();
+        vm.expectRevert();
+        index.withdrawForRebalance(address(0xBEEF), 1);
+    }
+
+    function test_unpause_resumesBuy() public {
+        index.pause();
+        index.unpause();
+        vm.startPrank(alice);
+        usdc.approve(address(index), 100_000_000);
+        index.buy(100_000_000);
+        vm.stopPrank();
+        assertEq(index.balanceOf(alice), 100_000_000 * 1e12);
+    }
+
+    function test_pause_onlyOwner() public {
+        vm.prank(address(0xBAD));
+        vm.expectRevert();
+        index.pause();
+    }
 }

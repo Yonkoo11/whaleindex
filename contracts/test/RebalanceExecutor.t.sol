@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, Vm} from "forge-std/Test.sol";
 import {RebalanceExecutor} from "../src/RebalanceExecutor.sol";
 import {IndexToken} from "../src/IndexToken.sol";
 import {NAVOracle} from "../src/NAVOracle.sol";
@@ -24,6 +24,10 @@ contract RebalanceExecutorTest is Test {
     address operator = address(0xA1);
     address alice = address(0xA11CE);
 
+    // Sample 32-byte commitment to an off-chain allocation document.
+    bytes32 constant CID = bytes32(uint256(0xC1DC1DC1DC1DC1DC1DC1DC1DC1DC1DC1DC1DC1DC1DC1DC1DC1DC1DC1DC1DC1D));
+    uint16  constant WHALES = 8;
+
     function setUp() public {
         vm.warp(1_700_000_000);
         usdc = new MockUSDC();
@@ -35,10 +39,7 @@ contract RebalanceExecutorTest is Test {
         domains[0] = 3; // Arbitrum
         router = new CCTPRouter(address(usdc), address(messenger), domains);
 
-        // Park vault: temporarily own as test, then transfer to executor.
         park = new USYCParkVault(address(usdc), address(usyc), address(this));
-
-        // Index token: temporarily own as test, then transfer to executor.
         index = new IndexToken(address(usdc), address(oracle), address(this));
 
         exec = new RebalanceExecutor(
@@ -52,7 +53,6 @@ contract RebalanceExecutorTest is Test {
             1_000_000_000  // dailyCap = 1000 USDC
         );
 
-        // Hand over control to executor.
         index.transferOwnership(address(exec));
         park.transferOwnership(address(exec));
         vm.prank(operator);
@@ -62,37 +62,28 @@ contract RebalanceExecutorTest is Test {
         vm.prank(alice);
         usdc.approve(address(index), 5_000_000_000);
         vm.prank(alice);
-        index.buy(3_000_000_000); // alice deposits 3000 USDC into index, treasury has headroom for multiple rebalances
+        index.buy(3_000_000_000);
+    }
+
+    function _doRebalance(uint256 total, uint256 parkAmt, uint256 newNav, uint64 reportedAt)
+        internal returns (uint64 nonce)
+    {
+        bytes32 recipient = bytes32(uint256(uint160(address(0xDEAD))));
+        vm.prank(operator);
+        return exec.rebalance(total, parkAmt, 3, recipient, 10, 1000, newNav, reportedAt, CID, WHALES);
     }
 
     function test_rebalance_routesCCTPAndUpdatesNAV() public {
-        bytes32 recipient = bytes32(uint256(uint160(address(0xDEAD))));
+        uint64 nonce = _doRebalance(200_000_000, 50_000_000, 500_000_000, uint64(block.timestamp));
 
-        vm.prank(operator);
-        uint64 nonce = exec.rebalance(
-            200_000_000,    // total move
-            50_000_000,     // park 50
-            3,              // Arbitrum
-            recipient,
-            10,             // maxFee
-            1000,           // minFinalityThreshold (1000 = standard finality per CCTP V2)
-            500_000_000,    // newNav = 500 USDC (unchanged)
-            uint64(block.timestamp)
-        );
-
-        // CCTP move was 200 - 50 parked = 150
         assertEq(messenger.callCount(), 1);
         assertEq(nonce, 1);
 
-        // NAV oracle updated and fresh.
         (uint256 nav, bool fresh) = oracle.getNAV();
         assertEq(nav, 500_000_000);
         assertTrue(fresh);
 
-        // USYC park has 50.
         assertEq(park.balanceUSDC(), 50_000_000);
-
-        // Index treasury reduced by 200 (the rebalance pull).
         assertEq(usdc.balanceOf(address(index)), 3_000_000_000 - 200_000_000);
     }
 
@@ -100,45 +91,28 @@ contract RebalanceExecutorTest is Test {
         bytes32 recipient = bytes32(uint256(uint160(address(0xDEAD))));
         vm.prank(operator);
         vm.expectRevert(RebalanceExecutor.PolicyExceededSingle.selector);
-        exec.rebalance(
-            600_000_000,    // > 500 maxSingleMove
-            0, 3, recipient, 10, 1000, 500_000_000, uint64(block.timestamp)
-        );
+        exec.rebalance(600_000_000, 0, 3, recipient, 10, 1000, 500_000_000, uint64(block.timestamp), CID, WHALES);
     }
 
     function test_rebalance_revertsOnDailyCapExceeded() public {
+        _doRebalance(500_000_000, 0, 500_000_000, uint64(block.timestamp));
+        vm.warp(block.timestamp + 60);
+        _doRebalance(500_000_000, 0, 500_000_000, uint64(block.timestamp));
+
+        vm.warp(block.timestamp + 60);
         bytes32 recipient = bytes32(uint256(uint160(address(0xDEAD))));
-
-        // First move uses 500 (the maxSingleMove cap).
-        vm.prank(operator);
-        exec.rebalance(500_000_000, 0, 3, recipient, 10, 1000, 500_000_000, uint64(block.timestamp));
-
-        // Second 500-move would push spentToday to 1000 (still ≤ dailyCap=1000), so OK.
-        // But add an extra 1 wei and we breach.
-        vm.warp(block.timestamp + 60);
-        vm.prank(operator);
-        exec.rebalance(500_000_000, 0, 3, recipient, 10, 1000, 500_000_000, uint64(block.timestamp));
-
-        // Third move (any size > 0) should breach.
-        vm.warp(block.timestamp + 60);
         vm.prank(operator);
         vm.expectRevert(RebalanceExecutor.PolicyExceededDaily.selector);
-        exec.rebalance(1, 0, 3, recipient, 10, 1000, 500_000_000, uint64(block.timestamp));
+        exec.rebalance(1, 0, 3, recipient, 10, 1000, 500_000_000, uint64(block.timestamp), CID, WHALES);
     }
 
     function test_rebalance_dailyCapResetsAcrossDays() public {
-        bytes32 recipient = bytes32(uint256(uint160(address(0xDEAD))));
+        _doRebalance(500_000_000, 0, 500_000_000, uint64(block.timestamp));
+        _doRebalance(500_000_000, 0, 500_000_000, uint64(block.timestamp + 1));
 
-        vm.prank(operator);
-        exec.rebalance(500_000_000, 0, 3, recipient, 10, 1000, 500_000_000, uint64(block.timestamp));
-        vm.prank(operator);
-        exec.rebalance(500_000_000, 0, 3, recipient, 10, 1000, 500_000_000, uint64(block.timestamp + 1));
-
-        // Move to next UTC day.
         vm.warp(block.timestamp + 1 days);
 
-        vm.prank(operator);
-        exec.rebalance(500_000_000 - 1, 0, 3, recipient, 10, 1000, 500_000_000, uint64(block.timestamp));
+        _doRebalance(500_000_000 - 1, 0, 500_000_000, uint64(block.timestamp));
 
         assertEq(exec.spentToday(), 500_000_000 - 1);
     }
@@ -147,7 +121,7 @@ contract RebalanceExecutorTest is Test {
         bytes32 recipient = bytes32(uint256(uint160(address(0xDEAD))));
         vm.prank(address(0xBAD));
         vm.expectRevert();
-        exec.rebalance(100_000_000, 0, 3, recipient, 10, 1000, 500_000_000, uint64(block.timestamp));
+        exec.rebalance(100_000_000, 0, 3, recipient, 10, 1000, 500_000_000, uint64(block.timestamp), CID, WHALES);
     }
 
     function test_setPolicy_onlyOwner() public {
@@ -160,5 +134,57 @@ contract RebalanceExecutorTest is Test {
         vm.prank(address(0xBAD));
         vm.expectRevert();
         exec.setPolicy(1, 1);
+    }
+
+    // --- new behaviour: pause + AllocationDecided + CID validation ---
+
+    function test_rebalance_revertsOnZeroCid() public {
+        bytes32 recipient = bytes32(uint256(uint160(address(0xDEAD))));
+        vm.prank(operator);
+        vm.expectRevert(RebalanceExecutor.MissingAllocationCID.selector);
+        exec.rebalance(100_000_000, 0, 3, recipient, 10, 1000, 500_000_000, uint64(block.timestamp), bytes32(0), WHALES);
+    }
+
+    function test_rebalance_emitsAllocationDecided() public {
+        bytes32 recipient = bytes32(uint256(uint160(address(0xDEAD))));
+        vm.recordLogs();
+        vm.prank(operator);
+        exec.rebalance(100_000_000, 0, 3, recipient, 10, 1000, 500_000_000, uint64(block.timestamp), CID, WHALES);
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 sig = keccak256("AllocationDecided(bytes32,uint16,uint64)");
+        bool found = false;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics.length > 0 && logs[i].topics[0] == sig) {
+                assertEq(logs[i].topics[1], CID);
+                found = true;
+                break;
+            }
+        }
+        assertTrue(found, "AllocationDecided not emitted");
+    }
+
+    function test_pause_blocksRebalance() public {
+        vm.prank(operator);
+        exec.pause();
+
+        bytes32 recipient = bytes32(uint256(uint160(address(0xDEAD))));
+        vm.prank(operator);
+        vm.expectRevert(); // Pausable: EnforcedPause
+        exec.rebalance(100_000_000, 0, 3, recipient, 10, 1000, 500_000_000, uint64(block.timestamp), CID, WHALES);
+    }
+
+    function test_unpause_restoresRebalance() public {
+        vm.prank(operator);
+        exec.pause();
+        vm.prank(operator);
+        exec.unpause();
+        _doRebalance(100_000_000, 0, 500_000_000, uint64(block.timestamp));
+    }
+
+    function test_pause_onlyOwner() public {
+        vm.prank(address(0xBAD));
+        vm.expectRevert();
+        exec.pause();
     }
 }

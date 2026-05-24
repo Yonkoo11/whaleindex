@@ -23,15 +23,31 @@
 - Demo video (Phase 4)
 - Builder-code monetization layer (V2 stretch)
 
-**Status:** [PASS — 2026-05-23] Phase 1 Gate proven on live Arc testnet. Rebalance settles in **0.78s** (target <2s) end-to-end agent → RebalanceExecutor → MockUSDC/USYC/CCTP + NAVOracle on Arc.
+**Status:** [V2 PASS — 2026-05-23] Phase 1 Gate proven on Arc with REAL native USDC + new safety primitives. Rebalance settles in **1.08s** (target <2s). 47 forge tests pass (up from 28).
 
-**Verified 2026-05-23 (Arc testnet, chain 5042002):**
-- 8 contracts deployed via `scripts/deploy-arc.sh` (uses `--skip-simulation` because Arc RPC stalls forge's pre-broadcast simulation; real gas estimation still runs server-side at broadcast)
-- Deploy cost: 8,994,964 gas (~0.18 USDC)
-- Bytecode verified on chain for all 8 addresses (sizes recorded in `deployments/arc-testnet.json`)
-- Ownership wired: IndexToken + USYCParkVault + NAVOracle all owned by RebalanceExecutor (NAVOracle was manual tx `0x71406...3bc3a8`; Deploy.s.sol now patched to auto-transfer when operator == deployer)
-- Smoke test `scripts/smoke-arc.sh` runs end-to-end against Arc: mint, approve, buy, rebalance — all land
-- Rebalance receipt: tx `0x7dc114...c97cd69`, latency **0.78s**, NAV $0 → $15, 5 USDC routed to Arbitrum (CCTP V2 nonce 1), gas 363,901
+**Verified 2026-05-23 (Arc testnet, V2 deploy):**
+- V2 contracts at addresses in `deployments/arc-testnet.json` (under `addresses`)
+- Real native Arc USDC swapped in (`0x3600...0000`, 6-dec ERC20 interface, same balance as native gas)
+- Mock CCTP TokenMessenger (real Arc CCTP rejects contract callers — see "Lessons learned" below)
+- Mock USYC (Teller allowlist pending)
+- Safety primitives live:
+  - NAVOracle.maxDeltaBps = 5000 (50% per-update cap)
+  - IndexToken Pausable on buy/redeem/withdrawForRebalance
+  - RebalanceExecutor Pausable on rebalance
+  - rebalance() requires non-zero allocation CID, reverts MissingAllocationCID otherwise
+  - AllocationDecided event emitted with CID + whaleCount on every rebalance — on-chain provenance for off-chain allocation decisions
+- 47 forge tests pass (28 prior + 19 new: 5 NAV bounds, 5 IndexToken pause, 5 RebalanceExecutor pause + 4 AllocationDecided)
+- V2 smoke test `scripts/smoke-arc.sh` end-to-end pass: real USDC approve → buy 1 USDC → rebalance 0.5 USDC → AllocationDecided event verified on chain
+- Rebalance tx `0x959e0abb...82596816`, latency **1.08s**, NAV $0 → $1, AllocationDecided cid `0x0d325a7bae92...`
+- Operator balance: 16.11 USDC remaining (started 19.80, total session cost ~3.69 USDC across deploys + tests + probes)
+
+**Lessons learned this session (architecture quality + Arc-specific):**
+- **Arc CCTP V2 silently rejects contract callers.** Direct EOA → `depositForBurn` works (tx `0x24f2b089...01c2cf95a` burned 0.1 USDC to Arbitrum domain 3). Contract → `depositForBurn` with valid balance + allowance silently reverts. Isolated via `CCTPProbe` (0xe4F6a70a...3B913F6): contract-side approve works, contract-side depositForBurn reverts. All Circle Arc samples use EOAs only. Likely `tx.origin == msg.sender` check or undocumented allowlist. V3 unblockers: Circle support ticket for contract allowlist OR off-chain orchestration where operator EOA signs depositForBurn directly.
+- **Paymaster isn't on Arc** (supported: Arbitrum, Avalanche, Base, Ethereum, Optimism, Polygon, Unichain). But Arc doesn't need it — USDC IS the native gas token. Replace "Paymaster" in stack table with "USDC-as-gas (Arc native)" — simpler, stronger story.
+- **Gateway is frontend-only** via `@circle-fin/app-kit` + `@circle-fin/unified-balance-kit`. No contract integration needed on our side. Buyer connects their unified USDC balance from any chain, deposits to Arc.
+- **`--skip-simulation` is mandatory for Arc forge deploys.** Forge's pre-broadcast simulation hangs against Canteen RPC even though every `eth_*` method responds in <2s via curl. Real gas estimation still happens server-side at broadcast.
+- **`arc-canteen rpc-url` pollutes stdout when server is offline** ("(server unreachable...)"). Use `grep -oE 'https://[^[:space:]]+' | head -1` for clean URL extraction.
+- **Deploy ownership pattern is fragile.** Original Deploy.s.sol had 3 separate `transferOwnership` calls; missed NAVOracle for single-key case → caused first rebalance to revert with `OwnableUnauthorizedAccount`. Fixed at Deploy.s.sol level (auto-transfer when operator==deployer). Senior follow-up: replace with atomic factory pattern in V3.
 
 **Verified 2026-05-17 (still valid):**
 - Local anvil smoke test (`python3 -m agent._smoke_test_local`) end-to-end pass

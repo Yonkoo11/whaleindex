@@ -11,9 +11,17 @@ import {MockUSDC} from "../src/mocks/MockUSDC.sol";
 import {MockUSYC} from "../src/mocks/MockUSYC.sol";
 import {MockTokenMessengerV2} from "../src/mocks/MockTokenMessengerV2.sol";
 
-/// Deploys the full WhaleIndex stack against Arc testnet.
-/// Uses mocks for USDC, USYC, and CCTP TokenMessenger until Circle publishes
-/// the canonical Arc-testnet addresses. Swap addresses in the env vars when live.
+/// Deploys the WhaleIndex stack against Arc testnet.
+///
+/// Address resolution priority for each external dependency:
+///   USDC:        $USDC_ADDRESS          → fall back to MockUSDC
+///   TokenMsg:    $TOKEN_MESSENGER       → fall back to MockTokenMessengerV2
+///   USYC:        $USYC_ADDRESS          → fall back to MockUSYC
+///
+/// Arc-testnet canonical addresses (set these in env before broadcasting):
+///   USDC_ADDRESS=0x3600000000000000000000000000000000000000        (native USDC ERC-20 interface)
+///   TOKEN_MESSENGER=0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA     (CCTP V2 TokenMessenger)
+///   USYC_ADDRESS=<unset until Teller allowlist approved>           (falls back to MockUSYC)
 contract DeployScript is Script {
     // CCTP V2 destination domains (verified 2026-05-17 from Circle docs).
     uint32 constant DOMAIN_ARBITRUM = 3;
@@ -21,47 +29,64 @@ contract DeployScript is Script {
 
     function run() external {
         uint256 deployerKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
-        address deployer   = vm.addr(deployerKey);
-        // If OPERATOR_ADDRESS isn't set, default to the deployer (single-key setup).
-        address operator   = vm.envOr("OPERATOR_ADDRESS", deployer);
+        address deployer    = vm.addr(deployerKey);
+        address operator    = vm.envOr("OPERATOR_ADDRESS", deployer);
 
         vm.startBroadcast(deployerKey);
 
-        // Mock dependencies (replace with live addresses when Canteen publishes).
-        MockUSDC usdc = new MockUSDC();
-        MockUSYC usyc = new MockUSYC(address(usdc));
-        MockTokenMessengerV2 messenger = new MockTokenMessengerV2();
+        // ---- External dependency resolution ----
+        address usdcAddr      = vm.envOr("USDC_ADDRESS",    address(0));
+        address messengerAddr = vm.envOr("TOKEN_MESSENGER", address(0));
+        address usycAddr      = vm.envOr("USYC_ADDRESS",    address(0));
 
-        // Core protocol stack.
+        if (usdcAddr == address(0)) {
+            usdcAddr = address(new MockUSDC());
+            console.log("  USDC source: MockUSDC (deployed fresh)");
+        } else {
+            console.log("  USDC source: REAL (from env)");
+        }
+
+        if (messengerAddr == address(0)) {
+            messengerAddr = address(new MockTokenMessengerV2());
+            console.log("  TokenMessenger source: MockTokenMessengerV2 (deployed fresh)");
+        } else {
+            console.log("  TokenMessenger source: REAL (from env)");
+        }
+
+        if (usycAddr == address(0)) {
+            usycAddr = address(new MockUSYC(usdcAddr));
+            console.log("  USYC source: MockUSYC (deployed fresh - Teller allowlist pending)");
+        } else {
+            console.log("  USYC source: REAL (from env)");
+        }
+
+        // ---- Core protocol stack ----
         NAVOracle nav = new NAVOracle(operator);
 
         uint32[] memory domains = new uint32[](2);
         domains[0] = DOMAIN_ARBITRUM;
         domains[1] = DOMAIN_SOLANA;
-        CCTPRouter router = new CCTPRouter(address(usdc), address(messenger), domains);
+        CCTPRouter router = new CCTPRouter(usdcAddr, messengerAddr, domains);
 
-        // Park and Index temporarily owned by deployer for ownership wiring.
-        USYCParkVault park = new USYCParkVault(address(usdc), address(usyc), deployer);
-        IndexToken index = new IndexToken(address(usdc), address(nav), deployer);
+        USYCParkVault park = new USYCParkVault(usdcAddr, usycAddr, deployer);
+        IndexToken   index = new IndexToken(usdcAddr, address(nav), deployer);
 
         RebalanceExecutor exec = new RebalanceExecutor(
-            address(usdc),
+            usdcAddr,
             address(index),
             address(nav),
             address(router),
             address(park),
             operator,
-            500 * 1e6,           // maxSingleMove = 500 USDC
-            10_000 * 1e6         // dailyCap = 10,000 USDC
+            500 * 1e6,    // maxSingleMove = 500 USDC
+            10_000 * 1e6  // dailyCap = 10,000 USDC
         );
 
-        // Hand control to the executor.
         index.transferOwnership(address(exec));
         park.transferOwnership(address(exec));
 
-        // NAVOracle: in the single-key setup (operator == deployer), we can transfer
-        // its ownership in the same broadcast. In the two-key setup, the operator
-        // must run nav.transferOwnership(address(exec)) themselves after deploy.
+        // Single-key setup: deployer == operator, so NAV ownership transfers
+        // in the same broadcast. Two-key setup leaves NAV owned by `operator`.
         if (operator == deployer) {
             nav.transferOwnership(address(exec));
         }
@@ -69,9 +94,9 @@ contract DeployScript is Script {
         vm.stopBroadcast();
 
         console.log("Deployed addresses:");
-        console.log("  USDC (mock):       ", address(usdc));
-        console.log("  USYC (mock):       ", address(usyc));
-        console.log("  TokenMessenger:    ", address(messenger));
+        console.log("  USDC:              ", usdcAddr);
+        console.log("  USYC:              ", usycAddr);
+        console.log("  TokenMessenger:    ", messengerAddr);
         console.log("  NAVOracle:         ", address(nav));
         console.log("  CCTPRouter:        ", address(router));
         console.log("  USYCParkVault:     ", address(park));

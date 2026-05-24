@@ -93,6 +93,9 @@ def main() -> int:
     print("Seeding local protocol treasury (idempotent)...")
     _seed_treasury(client, _ANVIL_TEST_KEY_PUBLIC_DEV_FIXTURE, amount_usdc_dec=100)
 
+    import hashlib, time as _t
+    cid = hashlib.sha256(f"smoke-local:{int(_t.time())}".encode()).digest()
+
     nav_before = client.current_nav()
     receipt = client.send_rebalance(RebalanceArgs(
         total_usdc=5_000_000,         # 5 USDC
@@ -102,6 +105,8 @@ def main() -> int:
         max_fee=1000,
         min_finality_threshold=0,
         new_nav_usdc=15_000_000,      # 15 USDC NAV (post-move)
+        allocation_cid=cid,
+        whale_count=3,
     ))
 
     print()

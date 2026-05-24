@@ -75,4 +75,88 @@ contract NAVOracleTest is Test {
         vm.expectRevert();
         oracle.updateNAV(100, uint64(block.timestamp));
     }
+
+    // --- maxDeltaBps bounds ---
+
+    function test_initial_maxDeltaBps_is5000() public view {
+        assertEq(oracle.maxDeltaBps(), 5_000); // 50%
+    }
+
+    function test_firstUpdate_skipsDeltaCheck() public {
+        vm.warp(1_700_000_000);
+        vm.prank(operator);
+        oracle.updateNAV(1_000_000_000_000, uint64(block.timestamp));
+        assertEq(oracle.nav(), 1_000_000_000_000);
+    }
+
+    function test_updateNAV_revertsOnExcessDeltaUp() public {
+        vm.warp(1_700_000_000);
+        vm.prank(operator);
+        oracle.updateNAV(100_000_000, uint64(block.timestamp));
+
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(
+            NAVOracle.NAVDeltaExceeded.selector, 100_000_000, 151_000_000, 5_000
+        ));
+        oracle.updateNAV(151_000_000, uint64(block.timestamp + 1));
+    }
+
+    function test_updateNAV_revertsOnExcessDeltaDown() public {
+        vm.warp(1_700_000_000);
+        vm.prank(operator);
+        oracle.updateNAV(100_000_000, uint64(block.timestamp));
+
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(
+            NAVOracle.NAVDeltaExceeded.selector, 100_000_000, 49_000_000, 5_000
+        ));
+        oracle.updateNAV(49_000_000, uint64(block.timestamp + 1));
+    }
+
+    function test_updateNAV_acceptsExactlyAtBound() public {
+        vm.warp(1_700_000_000);
+        vm.prank(operator);
+        oracle.updateNAV(100_000_000, uint64(block.timestamp));
+
+        vm.prank(operator);
+        oracle.updateNAV(150_000_000, uint64(block.timestamp + 1));
+        assertEq(oracle.nav(), 150_000_000);
+    }
+
+    function test_setMaxDeltaBps_onlyOwner() public {
+        vm.prank(operator);
+        oracle.setMaxDeltaBps(2_000);
+        assertEq(oracle.maxDeltaBps(), 2_000);
+
+        vm.prank(address(0xBAD));
+        vm.expectRevert();
+        oracle.setMaxDeltaBps(3_000);
+    }
+
+    function test_setMaxDeltaBps_revertsOnZero() public {
+        vm.prank(operator);
+        vm.expectRevert(NAVOracle.InvalidBps.selector);
+        oracle.setMaxDeltaBps(0);
+    }
+
+    function test_setMaxDeltaBps_revertsOnUnsanePositive() public {
+        vm.prank(operator);
+        vm.expectRevert(NAVOracle.InvalidBps.selector);
+        oracle.setMaxDeltaBps(100_001);
+    }
+
+    function test_setMaxDeltaBps_tighterAffectsNextUpdate() public {
+        vm.warp(1_700_000_000);
+        vm.prank(operator);
+        oracle.updateNAV(100_000_000, uint64(block.timestamp));
+
+        vm.prank(operator);
+        oracle.setMaxDeltaBps(1_000); // tighten to 10%
+
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(
+            NAVOracle.NAVDeltaExceeded.selector, 100_000_000, 120_000_000, 1_000
+        ));
+        oracle.updateNAV(120_000_000, uint64(block.timestamp + 1));
+    }
 }

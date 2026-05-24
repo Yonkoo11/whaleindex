@@ -6,13 +6,15 @@ import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
+import {Pausable} from "openzeppelin-contracts/contracts/utils/Pausable.sol";
 import {NAVOracle} from "./NAVOracle.sol";
 
 /// @title IndexToken — USDC-denominated index ERC-20 for WhaleIndex.
 /// Mint: deposit USDC, receive index shares at current NAV-per-share.
 /// Redeem: burn shares, receive USDC at current NAV-per-share.
 /// NAV is read from NAVOracle; reads revert if the oracle is stale.
-contract IndexToken is ERC20, Ownable, ReentrancyGuard {
+/// Pause stops buy/redeem/withdrawForRebalance — emergency kill switch.
+contract IndexToken is ERC20, Ownable, ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
 
     IERC20    public immutable usdc;
@@ -38,8 +40,12 @@ contract IndexToken is ERC20, Ownable, ReentrancyGuard {
         nav  = NAVOracle(navOracle_);
     }
 
+    /// Owner-only emergency stop. Pauses buy / redeem / withdrawForRebalance.
+    function pause() external onlyOwner { _pause(); }
+    function unpause() external onlyOwner { _unpause(); }
+
     /// Buyer pays USDC; receives shares proportional to current NAV.
-    function buy(uint256 usdcAmount) external nonReentrant returns (uint256 sharesOut) {
+    function buy(uint256 usdcAmount) external nonReentrant whenNotPaused returns (uint256 sharesOut) {
         if (usdcAmount == 0) revert ZeroAmount();
 
         usdc.safeTransferFrom(msg.sender, address(this), usdcAmount);
@@ -59,7 +65,7 @@ contract IndexToken is ERC20, Ownable, ReentrancyGuard {
     }
 
     /// Burn shares for USDC at current NAV.
-    function redeem(uint256 sharesIn) external nonReentrant returns (uint256 usdcOut) {
+    function redeem(uint256 sharesIn) external nonReentrant whenNotPaused returns (uint256 usdcOut) {
         if (sharesIn == 0) revert ZeroAmount();
 
         (uint256 navUsdc, bool fresh) = nav.getNAV();
@@ -77,7 +83,7 @@ contract IndexToken is ERC20, Ownable, ReentrancyGuard {
 
     /// Owner (RebalanceExecutor) can sweep USDC to the router during a rebalance.
     /// Caller pulls; nothing escapes the protocol that the owner can't trace.
-    function withdrawForRebalance(address to, uint256 amount) external onlyOwner {
+    function withdrawForRebalance(address to, uint256 amount) external onlyOwner whenNotPaused {
         usdc.safeTransfer(to, amount);
     }
 

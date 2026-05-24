@@ -4,60 +4,82 @@
     "chain_id": 5042002,
     "rpc": "https://rpc.testnet.arc-node.thecanteenapp.com/v1/<arc-canteen-token>",
     "explorer": "https://testnet.arcscan.app",
-    "deployed_at": "2026-05-21",
+    "deployed_at": "2026-05-23",
+    "version": "V2",
     "deployer": "0xf9946775891a24462cD4ec885d0D4E2675C84355",
     "operator": "0xf9946775891a24462cD4ec885d0D4E2675C84355",
     "deploy_tx_run": "contracts/broadcast/Deploy.s.sol/5042002/run-latest.json",
-    "deploy_gas_used_total": 8994964,
-    "deploy_cost_usdc_approx": 0.179914724587057064,
-    "note": "Phase-1 stack on Arc testnet. USDC/USYC/TokenMessenger are still MOCKS — swap for canonical Arc addresses below in next deploy round once smoke test passes against this set.",
-    "canonical_arc_addresses_for_v2": {
-      "USDC_native_iface": "0x3600000000000000000000000000000000000000",
-      "TokenMessengerV2_CCTP": "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA",
-      "GatewayWallet": "0x0077777d7EBA4688BDeF3E311b846F25870A19B9",
-      "GatewayMinter": "0x0022222ABE238Cc2C7Bb1f21003F0a260052475B",
-      "USYC": "0xe9185F0c5F296Ed1797AaE4238D26CCaBEadb86C",
-      "USYC_Teller": "0x9fdF14c5B14173D74C08Af27AebFf39240dC105A"
+    "v2_changes": [
+      "Native USDC swap-in (0x3600...0000) — was MockUSDC. Real Arc USDC, 6 decimals on ERC20 interface, 18 decimals as native gas.",
+      "NAVOracle.maxDeltaBps bound (default 5000 = 50%) — prevents NAV manipulation by compromised operator",
+      "Pausable on IndexToken (buy/redeem/withdrawForRebalance) — emergency kill switch",
+      "Pausable on RebalanceExecutor (rebalance) — agent halt without blocking redemptions",
+      "AllocationDecided(bytes32 cid, uint16 whaleCount, uint64 reportedAt) event — on-chain provenance: every rebalance commits to an off-chain allocation document hash, IPFS-resolvable",
+      "rebalance() requires non-zero allocation CID — reverts with MissingAllocationCID otherwise",
+      "Deploy.s.sol takes USDC_ADDRESS / TOKEN_MESSENGER / USYC_ADDRESS from env (mock fallback for local/unsupported)",
+      "47 forge tests pass (up from 28 in V1)"
+    ],
+    "known_limitations": {
+      "cctp_contract_caller_gate": {
+        "issue": "Arc testnet's real CCTP V2 TokenMessenger (0x8FE6B999...42DAA) silently rejects contract callers. EOA → depositForBurn works (verified, tx 0x24f2b089...01c2cf95a burned 0.1 USDC to Arbitrum). Contract → depositForBurn with valid balance + allowance reverts with no error data.",
+        "verification": "CCTPProbe at 0xe4F6a70ab9eB591d557011c5A71A8bb8E3B913F6 isolated the gate. Contract approve() works; contract depositForBurn() fails.",
+        "current_workaround": "Use MockTokenMessengerV2 in the deployment so the rebalance() flow works end-to-end. The on-chain rebalance still emits AllocationDecided + Routed + NAVUpdated; only the real USDC burn is mocked.",
+        "v3_unblockers": [
+          "Open a Circle support ticket to request allowlisting our RebalanceExecutor on Arc CCTP",
+          "Or migrate to off-chain orchestration: operator EOA signs depositForBurn directly after the executor pulls USDC into its own balance"
+        ]
+      },
+      "usyc_teller_allowlist": {
+        "issue": "Real USYC Teller (0x9fdF14c5...DC105A) requires wallet allowlisting via Circle support before mint/redeem.",
+        "current_workaround": "MockUSYC at the address below. Park/unpark events emit normally.",
+        "v3_unblockers": ["Request USYC allowlist at https://usyc.dev.hashnote.com/"]
+      },
+      "paymaster_not_on_arc": {
+        "issue": "Circle Paymaster operates on Arbitrum, Avalanche, Base, Ethereum, Optimism, Polygon, Unichain. Not Arc.",
+        "current_workaround": "Not needed. Arc uses USDC as the native gas token directly — Paymaster's 'pay gas in USDC' value prop is built into the chain.",
+        "framing": "Replace 'Paymaster' in the stack table with 'USDC-as-gas (Arc native)' — stronger story, simpler stack."
+      }
+    },
+    "canonical_arc_addresses_referenced_but_not_called": {
+      "GatewayWallet":   "0x0077777d7EBA4688BDeF3E311b846F25870A19B9",
+      "GatewayMinter":   "0x0022222ABE238Cc2C7Bb1f21003F0a260052475B",
+      "USYC":            "0xe9185F0c5F296Ed1797AaE4238D26CCaBEadb86C",
+      "USYC_Teller":     "0x9fdF14c5B14173D74C08Af27AebFf39240dC105A",
+      "TokenMessengerV2": "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA",
+      "_note": "Gateway = frontend integration only via @circle-fin/app-kit. USYC + CCTP need allowlists / op-side orchestration."
+    },
+    "v1_legacy_addresses_for_reference": {
+      "USDC_mock":           "0xf35bE6FFEBF91AcC27A78696cf912595C6b08AAA",
+      "USYC_mock":           "0xd2cad31A080b0daE98d9d6427e500B50bCb92774",
+      "TokenMessenger_mock": "0xeC5BfEe9d17e25cc8D52b8cB7fB81D8CaBb53c5f",
+      "NAVOracle":           "0xEde6Db2855BACF191E5B2E2d91B6276bB56bf183",
+      "CCTPRouter":          "0xD0db0eb608107862E963737FE87ffdFF7f400e3C",
+      "USYCParkVault":       "0xf9e5a9E147856D9B26aB04202D79C2c3dA4a326B",
+      "IndexToken":          "0xb8F4546e24e437779bC09c3b70ce70Ff9542bdD4",
+      "RebalanceExecutor":   "0x9A6d36A0487EA52df43E7704a97F47844C4Eac4E"
     }
   },
   "addresses": {
-    "USDC": "0xf35bE6FFEBF91AcC27A78696cf912595C6b08AAA",
-    "USYC": "0xd2cad31A080b0daE98d9d6427e500B50bCb92774",
-    "TokenMessenger": "0xeC5BfEe9d17e25cc8D52b8cB7fB81D8CaBb53c5f",
-    "NAVOracle": "0xEde6Db2855BACF191E5B2E2d91B6276bB56bf183",
-    "CCTPRouter": "0xD0db0eb608107862E963737FE87ffdFF7f400e3C",
-    "USYCParkVault": "0xf9e5a9E147856D9B26aB04202D79C2c3dA4a326B",
-    "IndexToken": "0xb8F4546e24e437779bC09c3b70ce70Ff9542bdD4",
-    "RebalanceExecutor": "0x9A6d36A0487EA52df43E7704a97F47844C4Eac4E"
+    "USDC":              "0x3600000000000000000000000000000000000000",
+    "USYC":              "0x86df318Ff4356682Da819516bd05B9873f3b8F07",
+    "TokenMessenger":    "0x60612Ad24e730aBF256cCFDd77dd0F431B20a079",
+    "NAVOracle":         "0xcbA2b630051527Cbebdc9212611a059c080B9e1c",
+    "CCTPRouter":        "0xC74Efa01142F7BA9e6B96C5c0841DcA0aB744E34",
+    "USYCParkVault":     "0xE8682ca1cE90A6be3BD91A01Bf3e39c19543521A",
+    "IndexToken":        "0x68a8809E118E6C778D199e0Dc7586AC88589b708",
+    "RebalanceExecutor": "0x2096B1FCad5d3d4303f1Ac3DABA4116c73B0D282"
   },
   "verification": {
-    "bytecode_size_bytes": {
-      "USDC": 3733,
-      "USYC": 6031,
-      "TokenMessenger": 2045,
-      "NAVOracle": 2364,
-      "CCTPRouter": 4598,
-      "USYCParkVault": 4517,
-      "IndexToken": 8094,
-      "RebalanceExecutor": 5667
+    "ownership_expected": {
+      "IndexToken.owner":        "RebalanceExecutor (auto-transferred at deploy)",
+      "USYCParkVault.owner":     "RebalanceExecutor (auto-transferred at deploy)",
+      "NAVOracle.owner":         "RebalanceExecutor (single-key auto-transfer at deploy)",
+      "RebalanceExecutor.owner": "0xf9946775891a24462cD4ec885d0D4E2675C84355 (deployer/operator)"
     },
-    "ownership": {
-      "IndexToken.owner": "0x9A6d36A0487EA52df43E7704a97F47844C4Eac4E",
-      "USYCParkVault.owner": "0x9A6d36A0487EA52df43E7704a97F47844C4Eac4E",
-      "NAVOracle.owner": "0x9A6d36A0487EA52df43E7704a97F47844C4Eac4E",
-      "NAVOracle.transfer_tx": "0x7140651a288e339e062811111a6250c90d0a46d5f30025a1c7c69cf6d63bc3a8"
-    },
-    "phase1_gate": {
-      "status": "PASS",
-      "rebalance_tx": "0x7dc114d7c5b42d8130542c37174c47d7a98f30ead1855651953bfd5c7c97cd69",
-      "settlement_latency_seconds": 0.78,
-      "settlement_target_seconds": 2.0,
-      "nav_before_usdc": 0,
-      "nav_after_usdc": 15000000,
-      "usdc_routed_to_arbitrum": 5000000,
-      "cctp_v2_nonce": 1,
-      "rebalance_gas_used": 363901,
-      "verified_at": "2026-05-23"
+    "safety_primitives_default": {
+      "NAVOracle.maxDeltaBps":   5000,
+      "RebalanceExecutor.paused": false,
+      "IndexToken.paused":        false
     },
     "verified_at": "2026-05-23"
   }

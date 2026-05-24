@@ -21,6 +21,7 @@ Idempotent: safe to re-run; treasury seeding skips if balance already adequate.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import sys
 from pathlib import Path
@@ -73,12 +74,30 @@ def _resolve_operator_key() -> str:
     sys.exit(2)
 
 
-def _seed_treasury(client: RebalanceClient, key: str, amount_usdc_dec: int = 100) -> None:
+def _seed_treasury(client: RebalanceClient, key: str, amount_usdc_dec: int = 1) -> None:
+    """
+    Load the IndexToken treasury with `amount_usdc_dec` USDC of shares.
+
+    Detects real USDC (no mint function) vs mock USDC. For real USDC,
+    the operator's existing USDC balance funds the buy; for mock, we mint first.
+    Idempotent: skips entirely if treasury already has enough.
+    """
     acct = Account.from_key(key)
     addrs = client.deployment["addresses"]
+    # Use a minimal ERC20 ABI — works for both mock and real USDC.
     usdc = client.w3.eth.contract(
         address=Web3.to_checksum_address(addrs["USDC"]),
-        abi=_load_abi("MockUSDC"),
+        abi=[
+            {"name": "balanceOf", "type": "function", "stateMutability": "view",
+             "inputs": [{"name": "a", "type": "address"}],
+             "outputs": [{"name": "", "type": "uint256"}]},
+            {"name": "approve", "type": "function", "stateMutability": "nonpayable",
+             "inputs": [{"name": "s", "type": "address"}, {"name": "a", "type": "uint256"}],
+             "outputs": [{"name": "", "type": "bool"}]},
+            {"name": "mint", "type": "function", "stateMutability": "nonpayable",
+             "inputs": [{"name": "to", "type": "address"}, {"name": "a", "type": "uint256"}],
+             "outputs": []},
+        ],
     )
     index = client.w3.eth.contract(
         address=Web3.to_checksum_address(addrs["IndexToken"]),
@@ -88,10 +107,12 @@ def _seed_treasury(client: RebalanceClient, key: str, amount_usdc_dec: int = 100
     treasury_balance = int(usdc.functions.balanceOf(addrs["IndexToken"]).call())
     target_base = amount_usdc_dec * 1_000_000
     if treasury_balance >= target_base:
-        print(f"  treasury already has {treasury_balance / 1e6:.2f} mock USDC; skipping seed")
+        print(f"  treasury already has {treasury_balance / 1e6:.2f} USDC; skipping seed")
         return
 
-    mint_amount = target_base * 10  # 10x headroom for retries
+    operator_balance = int(usdc.functions.balanceOf(acct.address).call())
+    print(f"  operator USDC balance: {operator_balance / 1e6:.6f}")
+
     nonce = client.w3.eth.get_transaction_count(acct.address)
 
     def _send(fn, n: int, label: str) -> None:
@@ -109,9 +130,25 @@ def _seed_treasury(client: RebalanceClient, key: str, amount_usdc_dec: int = 100
             raise RuntimeError(f"seed step '{label}' reverted: {tx_hash.hex()}")
         print(f"  seed: {label} ok (block {rcpt['blockNumber']}, gas {rcpt['gasUsed']:,})")
 
-    _send(usdc.functions.mint(acct.address, mint_amount), nonce, f"mint {mint_amount/1e6:.0f} mUSDC")
-    _send(usdc.functions.approve(addrs["IndexToken"], mint_amount), nonce + 1, "approve IndexToken")
-    _send(index.functions.buy(target_base), nonce + 2, f"buy {target_base/1e6:.0f} mUSDC of shares")
+    # Try mint first — works on MockUSDC, reverts on real USDC.
+    n = nonce
+    try:
+        # Build but DON'T send first, just to estimate; if mint isn't callable, eth_call will reject.
+        mint_amount = target_base * 10
+        usdc.functions.mint(acct.address, mint_amount).call({"from": acct.address})
+        _send(usdc.functions.mint(acct.address, mint_amount), n, f"mint {mint_amount/1e6:.0f} mUSDC")
+        n += 1
+    except Exception:
+        print("  seed: real USDC detected — skipping mint, using operator's existing balance")
+        if operator_balance < target_base:
+            raise RuntimeError(
+                f"operator balance ({operator_balance/1e6:.4f} USDC) below seed target "
+                f"({target_base/1e6:.4f} USDC). Top up from faucet.circle.com."
+            )
+
+    _send(usdc.functions.approve(addrs["IndexToken"], target_base), n,
+          f"approve IndexToken for {target_base/1e6:.4f} USDC")
+    _send(index.functions.buy(target_base), n + 1, f"buy {target_base/1e6:.4f} USDC of shares")
 
 
 def main() -> int:
@@ -133,21 +170,31 @@ def main() -> int:
 
     client = RebalanceClient(w3, deployment)
 
+    # Smaller seed for real USDC: 1 USDC of shares funds the treasury for a 0.5 USDC rebalance.
+    # Leaves ~18 USDC in the operator wallet for ongoing gas.
     print("Seeding Arc protocol treasury (idempotent)...")
-    _seed_treasury(client, key, amount_usdc_dec=100)
+    _seed_treasury(client, key, amount_usdc_dec=1)
 
     nav_before = client.current_nav()
-    print(f"NAV before rebalance: ${nav_before/1e6:,.2f}")
+    print(f"NAV before rebalance: ${nav_before/1e6:,.4f}")
 
-    print("Sending rebalance: 5 USDC -> Arbitrum (CCTP V2 domain 3)...")
+    snapshot = f"smoke-test:{int(__import__('time').time())}:0.5-usdc-to-arbitrum".encode()
+    cid = hashlib.sha256(snapshot).digest()
+
+    # CCTP V2 finality: 1000 = Fast (requires Fast Transfer Allowance), 2000 = Standard.
+    # Standard for smoke test: no allowance dependency, more permissive.
+    # maxFee: 0.05 USDC ceiling on a 0.5 USDC transfer (10%) — well above any reasonable protocol fee.
+    print(f"Sending rebalance: 0.5 USDC -> Arbitrum (CCTP V2 domain 3, Standard), cid={cid.hex()[:12]}...")
     receipt = client.send_rebalance(RebalanceArgs(
-        total_usdc=5_000_000,
+        total_usdc=500_000,    # 0.5 USDC
         park_amount=0,
-        destination_domain=3,
+        destination_domain=3,  # Arbitrum
         mint_recipient_evm=Account.from_key(key).address,
-        max_fee=1000,
-        min_finality_threshold=0,
-        new_nav_usdc=15_000_000,
+        max_fee=50_000,        # 0.05 USDC max fee
+        min_finality_threshold=2000,  # Standard finality
+        new_nav_usdc=1_000_000,  # 1 USDC NAV post-move
+        allocation_cid=cid,
+        whale_count=3,
     ))
 
     print()

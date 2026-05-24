@@ -17,6 +17,8 @@ Usage (programmatic):
         max_fee=1000,
         min_finality_threshold=0,
         new_nav_usdc=10_000_000,
+        allocation_cid=b"\\x00" * 32, # 32-byte commitment to off-chain allocation doc
+        whale_count=8,
     ))
     print(receipt.plain_english())
 
@@ -90,6 +92,8 @@ class RebalanceArgs:
     max_fee: int                  # CCTP V2 max fee
     min_finality_threshold: int   # CCTP V2 min finality
     new_nav_usdc: int             # NAV reading the agent computed
+    allocation_cid: bytes         # 32-byte commitment to the allocation doc (IPFS CID truncated or keccak256)
+    whale_count: int              # number of whales the allocation document covers
     reported_at: int | None = None  # unix seconds; defaults to now
 
 
@@ -175,6 +179,8 @@ class RebalanceClient:
         nonce = self.w3.eth.get_transaction_count(operator.address)
         chain_id = self.w3.eth.chain_id
 
+        if len(args.allocation_cid) != 32:
+            raise ValueError(f"allocation_cid must be 32 bytes, got {len(args.allocation_cid)}")
         tx = self.executor.functions.rebalance(
             args.total_usdc,
             args.park_amount,
@@ -184,6 +190,8 @@ class RebalanceClient:
             args.min_finality_threshold,
             args.new_nav_usdc,
             reported_at,
+            args.allocation_cid,
+            args.whale_count,
         ).build_transaction({
             "from": operator.address,
             "nonce": nonce,
@@ -239,10 +247,20 @@ def _main() -> None:
     parser.add_argument("--max-fee", type=int, default=1000)
     parser.add_argument("--min-finality", type=int, default=0)
     parser.add_argument("--new-nav", type=float, help="New NAV in USDC (decimal). Defaults to --total.")
+    parser.add_argument("--cid-hex", help="32-byte allocation CID as hex (with or without 0x). Default = keccak256(timestamp).")
+    parser.add_argument("--whales", type=int, default=0, help="Whale count covered by the allocation doc.")
     args = parser.parse_args()
 
     client = RebalanceClient.from_deployments(args.network)
     new_nav_dec = args.new_nav if args.new_nav is not None else args.total
+
+    if args.cid_hex:
+        cid = bytes.fromhex(args.cid_hex.removeprefix("0x"))
+    else:
+        # Synthetic CID so the CLI is usable without IPFS pinning wired up.
+        import hashlib
+        cid = hashlib.sha256(str(int(time.time())).encode()).digest()
+
     receipt = client.send_rebalance(RebalanceArgs(
         total_usdc=int(args.total * 1e6),
         park_amount=int(args.park * 1e6),
@@ -251,6 +269,8 @@ def _main() -> None:
         max_fee=args.max_fee,
         min_finality_threshold=args.min_finality,
         new_nav_usdc=int(new_nav_dec * 1e6),
+        allocation_cid=cid,
+        whale_count=args.whales,
     ))
     print(receipt.plain_english())
     print(f"  tx: {receipt.tx_hash}")
