@@ -58,15 +58,121 @@ async def fetch_pnl_window(
     wallet: str,
     window_days: int = 30,
 ) -> float:
+    """Backward-compat shim: returns 30d realised PnL as a single float."""
+    metrics = await fetch_metrics_window(client, wallet, window_days)
+    return metrics.pnl_usd
+
+
+@dataclass
+class WindowMetrics:
+    """Extended trading metrics over a rolling window.
+
+    Computed directly from HL's userFillsByTime response:
+      pnl_usd:       sum of closedPnl across all fills in the window
+      sharpe:        annualised Sharpe (mean_daily_pnl / std_daily_pnl * sqrt(252)).
+                     Zero if std=0 or fewer than 2 active days.
+      max_drawdown_pct: peak-to-trough cumulative-PnL drawdown, expressed as a
+                     fraction of the peak. Zero if no positive peak in window.
+      win_rate:      fraction of fills with closedPnl > 0
+      fill_count:    total fills in the window
+      volume_usd:    sum of |size * px| across all fills
+      window_days:   the window the metrics were computed against
     """
-    Realised PnL over the trailing `window_days` for one wallet, in USD.
+    pnl_usd: float
+    sharpe: float
+    max_drawdown_pct: float
+    win_rate: float
+    fill_count: int
+    volume_usd: float
+    window_days: int
 
-    Uses Hyperliquid's userFillsByTime endpoint. Each fill carries `closedPnl`
-    (the realised PnL booked by that specific fill — partial closes, full closes,
-    funding adjustments). Summing closedPnl across fills in the window gives
-    realised PnL for that period.
 
-    Reference: https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint
+def _compute_metrics_from_fills(fills: list[dict[str, Any]], window_days: int) -> WindowMetrics:
+    """Deterministic metric computation. Pure function — testable without HL."""
+    import math
+    from collections import defaultdict
+
+    if not fills:
+        return WindowMetrics(
+            pnl_usd=0.0, sharpe=0.0, max_drawdown_pct=0.0,
+            win_rate=0.0, fill_count=0, volume_usd=0.0, window_days=window_days,
+        )
+
+    total_pnl = 0.0
+    wins = 0
+    volume = 0.0
+    daily_pnl: dict[str, float] = defaultdict(float)
+    cumulative_series: list[tuple[int, float]] = []  # (time_ms, cum_pnl)
+
+    # Iterate in chronological order so the cumulative series is monotonic in time.
+    sorted_fills = sorted(fills, key=lambda f: int(f.get("time", 0)))
+    cum = 0.0
+    for f in sorted_fills:
+        try:
+            pnl = float(f.get("closedPnl", "0") or "0")
+        except (TypeError, ValueError):
+            pnl = 0.0
+        try:
+            sz = abs(float(f.get("sz", "0") or "0"))
+            px = abs(float(f.get("px", "0") or "0"))
+        except (TypeError, ValueError):
+            sz = px = 0.0
+
+        t_ms = int(f.get("time", 0))
+        day = time.strftime("%Y-%m-%d", time.gmtime(t_ms / 1000.0))
+        daily_pnl[day] += pnl
+        total_pnl += pnl
+        volume += sz * px
+        if pnl > 0:
+            wins += 1
+        cum += pnl
+        cumulative_series.append((t_ms, cum))
+
+    fill_count = len(sorted_fills)
+    win_rate = wins / fill_count if fill_count else 0.0
+
+    # Sharpe: daily-pnl distribution -> annualised.
+    daily_values = list(daily_pnl.values())
+    if len(daily_values) >= 2:
+        mean = sum(daily_values) / len(daily_values)
+        var = sum((x - mean) ** 2 for x in daily_values) / (len(daily_values) - 1)
+        std = math.sqrt(var)
+        sharpe = (mean / std) * math.sqrt(252.0) if std > 0 else 0.0
+    else:
+        sharpe = 0.0
+
+    # Max drawdown over the running cumulative series.
+    max_dd_pct = 0.0
+    running_peak = 0.0
+    for _, c in cumulative_series:
+        if c > running_peak:
+            running_peak = c
+        if running_peak > 0:
+            dd = (running_peak - c) / running_peak
+            if dd > max_dd_pct:
+                max_dd_pct = dd
+
+    return WindowMetrics(
+        pnl_usd=round(total_pnl, 2),
+        sharpe=round(sharpe, 3),
+        max_drawdown_pct=round(max_dd_pct, 4),
+        win_rate=round(win_rate, 3),
+        fill_count=fill_count,
+        volume_usd=round(volume, 2),
+        window_days=window_days,
+    )
+
+
+async def fetch_metrics_window(
+    client: httpx.AsyncClient,
+    wallet: str,
+    window_days: int = 30,
+) -> WindowMetrics:
+    """
+    Full extended-metrics fetch for one wallet over the trailing window.
+
+    One HTTP call against HL's userFillsByTime. The metric computation is
+    a pure function — see _compute_metrics_from_fills for the implementation.
     """
     now_ms = int(time.time() * 1000)
     start_ms = now_ms - window_days * 86_400 * 1000
@@ -79,10 +185,8 @@ async def fetch_pnl_window(
     }
     resp = await client.post(HL_INFO_URL, json=body, timeout=15.0)
     resp.raise_for_status()
-    fills = resp.json()
-    if not isinstance(fills, list):
-        return 0.0
-    return sum(float(f.get("closedPnl", "0") or "0") for f in fills)
+    fills = resp.json() if isinstance(resp.json(), list) else []
+    return _compute_metrics_from_fills(fills, window_days)
 
 
 async def fetch_pnl_window_all(

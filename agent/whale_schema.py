@@ -64,6 +64,13 @@ class WhaleMetrics:
     pnl_30d_usd: float = 0.0
     position_count_current: int = 0
     last_metrics_refresh: str = ""  # ISO8601, "" = never refreshed
+    # Extended metrics (added 2026-05-24, B2). Default to 0 / "" so older
+    # entries roundtrip without churn until they're refreshed.
+    sharpe_30d: float = 0.0
+    max_drawdown_pct: float = 0.0
+    win_rate: float = 0.0
+    fill_count_30d: int = 0
+    volume_30d_usd: float = 0.0
 
 
 @dataclass
@@ -114,6 +121,11 @@ class WhaleEntry:
             pnl_30d_usd=float(m.get("pnl_30d_usd", 0.0)),
             position_count_current=int(m.get("position_count_current", 0)),
             last_metrics_refresh=str(m.get("last_metrics_refresh", "")),
+            sharpe_30d=float(m.get("sharpe_30d", 0.0)),
+            max_drawdown_pct=float(m.get("max_drawdown_pct", 0.0)),
+            win_rate=float(m.get("win_rate", 0.0)),
+            fill_count_30d=int(m.get("fill_count_30d", 0)),
+            volume_30d_usd=float(m.get("volume_30d_usd", 0.0)),
         )
 
         return cls(

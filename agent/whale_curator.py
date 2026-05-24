@@ -59,7 +59,7 @@ from agent.whale_schema import (
 )
 from agent.leaderboard_reader import (
     fetch_clearinghouse_state,
-    fetch_pnl_window,
+    fetch_metrics_window,
     parse_positions,
 )
 
@@ -78,15 +78,20 @@ def _checksum_or_lower(addr: str) -> str:
 
 
 async def _fetch_metrics(wallet: str, window_days: int = 30) -> WhaleMetrics:
-    """Fetch current position count + 30d realised PnL from Hyperliquid."""
+    """Fetch current position count + extended trading metrics from Hyperliquid."""
     async with httpx.AsyncClient() as client:
         state = await fetch_clearinghouse_state(client, wallet)
-        pnl = await fetch_pnl_window(client, wallet, window_days)
+        metrics = await fetch_metrics_window(client, wallet, window_days)
     positions = parse_positions(wallet, state)
     return WhaleMetrics(
-        pnl_30d_usd=float(pnl),
+        pnl_30d_usd=metrics.pnl_usd,
         position_count_current=len(positions),
         last_metrics_refresh=_utc_now_iso(),
+        sharpe_30d=metrics.sharpe,
+        max_drawdown_pct=metrics.max_drawdown_pct,
+        win_rate=metrics.win_rate,
+        fill_count_30d=metrics.fill_count,
+        volume_30d_usd=metrics.volume_usd,
     )
 
 
@@ -168,14 +173,21 @@ def cmd_refresh_metrics(args: argparse.Namespace) -> int:
             for e in targets:
                 try:
                     state = await fetch_clearinghouse_state(client, e.wallet)
-                    pnl = await fetch_pnl_window(client, e.wallet, args.window_days)
+                    m = await fetch_metrics_window(client, e.wallet, args.window_days)
                     positions = parse_positions(e.wallet, state)
                     e.metrics = WhaleMetrics(
-                        pnl_30d_usd=float(pnl),
+                        pnl_30d_usd=m.pnl_usd,
                         position_count_current=len(positions),
                         last_metrics_refresh=_utc_now_iso(),
+                        sharpe_30d=m.sharpe,
+                        max_drawdown_pct=m.max_drawdown_pct,
+                        win_rate=m.win_rate,
+                        fill_count_30d=m.fill_count,
+                        volume_30d_usd=m.volume_usd,
                     )
-                    print(f"  {e.wallet}  pnl_30d=${pnl:+,.2f}  positions={len(positions)}")
+                    print(f"  {e.wallet}  pnl_30d=${m.pnl_usd:+,.2f}  sharpe={m.sharpe:+.2f}  "
+                          f"win_rate={m.win_rate*100:.0f}%  maxDD={m.max_drawdown_pct*100:.1f}%  "
+                          f"fills={m.fill_count}  positions={len(positions)}")
                 except Exception as ex:
                     print(f"  {e.wallet}  REFRESH FAILED: {ex}", file=sys.stderr)
 

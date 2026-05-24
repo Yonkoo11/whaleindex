@@ -54,10 +54,11 @@ from agent.contract_client import (
 )
 from agent.leaderboard_reader import (
     fetch_clearinghouse_state,
-    fetch_pnl_window,
+    fetch_metrics_window,
     load_watchlist,
     parse_positions,
     WhalePosition,
+    WindowMetrics,
 )
 from agent.allocation_engine import Allocation
 from agent.selection_engine import WhaleScore as DecayScore, evaluate, survivors
@@ -79,34 +80,36 @@ DEFAULT_DESTINATION_DOMAIN = 3  # Arbitrum
 DEFAULT_DESTINATION_RECIPIENT_FALLBACK = "0xf9946775891a24462cD4ec885d0D4E2675C84355"
 
 
-async def _fetch_positions_and_pnl(
+async def _fetch_positions_and_metrics(
     wallets: list[str], pnl_window_days: int
-) -> tuple[list[WhalePosition], dict[str, float]]:
-    """Concurrent fetch of positions + PnL across every wallet."""
+) -> tuple[list[WhalePosition], dict[str, WindowMetrics]]:
+    """Concurrent fetch of positions + extended metrics across every wallet."""
     async with httpx.AsyncClient() as client:
         position_tasks = [fetch_clearinghouse_state(client, w) for w in wallets]
-        pnl_tasks = [fetch_pnl_window(client, w, pnl_window_days) for w in wallets]
-        results = await asyncio.gather(*(position_tasks + pnl_tasks), return_exceptions=True)
+        metric_tasks = [fetch_metrics_window(client, w, pnl_window_days) for w in wallets]
+        results = await asyncio.gather(*(position_tasks + metric_tasks), return_exceptions=True)
 
     n = len(wallets)
     position_results = results[:n]
-    pnl_results = results[n:]
+    metric_results = results[n:]
 
     positions: list[WhalePosition] = []
-    pnl: dict[str, float] = {}
-    for wallet, p_res, pnl_res in zip(wallets, position_results, pnl_results):
+    metrics: dict[str, WindowMetrics] = {}
+    for wallet, p_res, m_res in zip(wallets, position_results, metric_results):
         if isinstance(p_res, dict):
             positions.extend(parse_positions(wallet, p_res))
         else:
             print(f"  WARN: positions fetch failed for {wallet}: {p_res}")
-        if isinstance(pnl_res, BaseException):
-            print(f"  WARN: PnL fetch failed for {wallet}: {pnl_res}")
-            pnl[wallet] = 0.0
-        elif isinstance(pnl_res, (int, float)):
-            pnl[wallet] = float(pnl_res)
+        if isinstance(m_res, WindowMetrics):
+            metrics[wallet] = m_res
         else:
-            pnl[wallet] = 0.0
-    return positions, pnl
+            if isinstance(m_res, BaseException):
+                print(f"  WARN: metrics fetch failed for {wallet}: {m_res}")
+            metrics[wallet] = WindowMetrics(
+                pnl_usd=0.0, sharpe=0.0, max_drawdown_pct=0.0,
+                win_rate=0.0, fill_count=0, volume_usd=0.0, window_days=pnl_window_days,
+            )
+    return positions, metrics
 
 
 def _build_allocation_doc(
@@ -215,12 +218,16 @@ async def run(
     wallets = [w["wallet"] for w in watchlist]
     print(f"[1/7] watchlist: {len(wallets)} whales")
 
-    # Step 2: concurrent positions + PnL
-    print(f"[2/7] fetching HL positions + {pnl_window_days}d realised PnL...")
-    positions, pnl = await _fetch_positions_and_pnl(wallets, pnl_window_days)
+    # Step 2: concurrent positions + extended metrics (PnL + Sharpe + drawdown + win-rate + volume)
+    print(f"[2/7] fetching HL positions + {pnl_window_days}d extended metrics...")
+    positions, metrics_by_wallet = await _fetch_positions_and_metrics(wallets, pnl_window_days)
+    pnl = {w: m.pnl_usd for w, m in metrics_by_wallet.items()}
     print(f"      {len(positions)} positions from {len({p.wallet for p in positions})} whales")
     for w in wallets:
-        print(f"      {w[:10]}...  PnL ${pnl[w]:>+12,.2f}   positions={sum(1 for p in positions if p.wallet == w)}")
+        m = metrics_by_wallet[w]
+        print(f"      {w[:10]}...  PnL ${m.pnl_usd:>+12,.2f}  sharpe={m.sharpe:+5.2f}  "
+              f"win={m.win_rate*100:>3.0f}%  maxDD={m.max_drawdown_pct*100:>4.1f}%  "
+              f"fills={m.fill_count:>3d}  positions={sum(1 for p in positions if p.wallet == w)}")
 
     # Step 3: rank-decay filter (selection_engine — evicts whales whose rank fell)
     print("[3/7] rank-decay filter...")
@@ -234,14 +241,15 @@ async def run(
     # Step 4: multi-agent decision (Scorer -> Allocator -> Risk -> Coordinator)
     print("[4/7] multi-agent decision (Scorer + Allocator + Risk + Coordinator)...")
     surviving_positions = [p for p in positions if p.wallet in set(keep)]
-    surviving_pnl = {w: pnl.get(w, 0.0) for w in keep}
+    surviving_metrics = {w: metrics_by_wallet[w] for w in keep}
 
     scorer = ScorerAgent()
     allocator = AllocatorAgent()
     risk = RiskAgent()
     coordinator = CoordinatorAgent()
 
-    scored = scorer.score(keep, surviving_positions, surviving_pnl)
+    # Extended scoring (uses Sharpe, drawdown, win-rate in addition to PnL).
+    scored = scorer.score(keep, surviving_positions, metrics_by_wallet=surviving_metrics)
     print(f"      Scorer:    {len(scored)} whales scored")
     for s in scored[:5]:
         print(f"        {s.wallet[:10]}...  composite={s.score:>5.1f}/100   {s.reasoning}")
