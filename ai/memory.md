@@ -30,7 +30,7 @@
 - **T2.7** — Multi-agent decomposition under `agent/agents/`: ScorerAgent (composite 0-100 with PnL/position-quality/recency components), AllocatorAgent (3 proposals: equal / score-weighted / kelly-bounded), RiskAgent (concentration / imbalance / diversification / dust checks; accept / accept_with_adjustment / veto), CoordinatorAgent (precedence: kelly > score > equal among accepted). Allocation doc v2 carries the full multi-agent audit dict. 12 unit + integration tests.
 - **T1.2** — Off-chain CCTP path. `RebalanceExecutor.prepareRebalance(...)` pulls USDC + parks + transfers route amount to operator EOA + emits BurnPrepared. Operator EOA signs the real `depositForBurn` directly (Arc CCTP gate is contract-only; EOA works — verified by prior probe). `commitRebalance(burnId, cctpNonce, newNav, reportedAt)` records nonce + updates NAV. `contract_client.send_rebalance_offchain_cctp(args, real_messenger)` drives all 3 txs. Orchestrator gets `--cctp-mode {on-chain, off-chain}` flag. Existing one-shot `rebalance(...)` preserved. 9 new forge tests.
 - Tests: forge 56/56 (up from 47), pytest 17/17. CI green.
-- Commits: `c6...` T1.1, `9e...` T2.7, `3dd67ab` T1.2. All on master.
+- Commits: `fef5f8a` T1.1, `3572783` T2.7, `3dd67ab` T1.2. All on master.
 
 **Verified 2026-05-24 (Phase B agentic loop + Arcscan verification):**
 - `agent/orchestrator.py` wires the full pipeline as one entry point: watchlist → concurrent positions + 30d realised PnL → rank-decay filter → top-N allocation → canonical-JSON allocation doc with keccak256 CID → publish to `docs/allocations/<cid>.json` (GitHub Pages serves it publicly) → sign + submit rebalance with CID anchored on chain via AllocationDecided event → append outcome to `data/orchestrator-history.jsonl`
