@@ -61,13 +61,24 @@
   },
   "addresses": {
     "USDC":              "0x3600000000000000000000000000000000000000",
+    "USYC":              "0x2B540589EAF231b930Ed5D53ee3CE292904ccb2d",
+    "TokenMessenger":    "0x2522423855550e82016103c79F097042Cf2d5a0B",
+    "NAVOracle":         "0xfEbB84BE47b0d440Ba08DaE0f5E3b09B4f989Cf8",
+    "CCTPRouter":        "0x0D9D3e16258AAF3297A67a443a55ADe0E3f49849",
+    "USYCParkVault":     "0x59a69BAFb6dCc9BF304bBE0583561aDf3B613435",
+    "IndexToken":        "0xAdEa3FaE6011c2D275868d1c1933B37BE7648269",
+    "RebalanceExecutor": "0xb06a30226979789508306dAA9b027914045a4024",
+    "WhaleAttestation":  "0x1d2d34D941b13CbF233051074F007ecf68fB0F7f"
+  },
+  "v2_legacy_addresses_for_reference": {
     "USYC":              "0x86df318Ff4356682Da819516bd05B9873f3b8F07",
     "TokenMessenger":    "0x60612Ad24e730aBF256cCFDd77dd0F431B20a079",
     "NAVOracle":         "0xcbA2b630051527Cbebdc9212611a059c080B9e1c",
     "CCTPRouter":        "0xC74Efa01142F7BA9e6B96C5c0841DcA0aB744E34",
     "USYCParkVault":     "0xE8682ca1cE90A6be3BD91A01Bf3e39c19543521A",
     "IndexToken":        "0x68a8809E118E6C778D199e0Dc7586AC88589b708",
-    "RebalanceExecutor": "0x2096B1FCad5d3d4303f1Ac3DABA4116c73B0D282"
+    "RebalanceExecutor": "0x2096B1FCad5d3d4303f1Ac3DABA4116c73B0D282",
+    "_note": "V2 deploy from 2026-05-23. Superseded by V3 (2026-05-24) which adds prepareRebalance/commitRebalance + nonReentrant + park return-value check + inline audit comments."
   },
   "verification": {
     "ownership_expected": {

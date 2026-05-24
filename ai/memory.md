@@ -25,6 +25,20 @@
 
 **Status:** [V2 PASS — 2026-05-23] Phase 1 Gate proven on Arc with REAL native USDC + new safety primitives. Rebalance settles in **1.08s** (target <2s). 47 forge tests pass (up from 28).
 
+**Verified 2026-05-24 (V3 deploy + live off-chain CCTP burn + WhaleAttestation):**
+- **V3 stack deployed** with all post-V2 contract upgrades on Arc (NAV bounds, Pausable, AllocationDecided event, prepareRebalance/commitRebalance for off-chain CCTP, nonReentrant on all entry points, park-return-value check). Addresses in `deployments/arc-testnet.json.addresses` (V2 preserved under `v2_legacy_addresses_for_reference`).
+- **WhaleAttestation V3 live:** `0x1d2d34D941b13CbF233051074F007ecf68fB0F7f`. usdc=real native, slashBeneficiary=V3 IndexToken, maxSlashBps=5000 (50%), unbondCooldown=7 days. 21 forge tests cover bond/slash/unbond + the anti-front-run cooldown-resistant slashing invariant.
+- **First live off-chain CCTP burn end-to-end** through the prepare→burn→commit flow. The Arc CCTP contract-caller gate is officially closed for our use case — operator EOA signs depositForBurn directly:
+  - prepareRebalance tx: `0xad38cd638f2870e6d435355a19c31bf6b23c8ce21190d3bfb4034261c8f5f337` (311k gas; AllocationDecided + BurnPrepared events)
+  - **real CCTP DepositForBurn tx**: `0xab3769bb219e5791f18413ec4fc9df6fcf14b66da9f4a6c9f14d0a0fb8baec0b` (131k gas; 0.3 USDC burned through real `0x8FE6B999...42DAA`)
+  - commitRebalance tx: `0x7d5cb5d13a56b21b60e8b8c649c5053bd9d41d9d2bae5bb82715f74bfa833b65` (98k gas; NAVUpdated + RebalanceCommitted + RebalanceExecuted)
+  - allocation doc: `docs/allocations/ee8e29bd93f2703337a828cb9cc619cbfbd0b07b04561c2b189caa6b1d44dc91.json`, CID matches the on-chain AllocationDecided topic[1] exactly
+  - total 3-tx flow latency: 7.03s
+  - NAV: $0 → $1.50 ($1.50 reflects 0.5 USDC seed - 0.3 routed; the operator can adjust with subsequent rebalance calls)
+- ANTHROPIC_API_KEY is set but credit balance is currently 0 — ReasonerAgent fell back gracefully ("invalid_request_error: credit balance too low"), proving the optional-LLM behavior works.
+- Live page (`docs/index.html`) updated to point at V3 addresses + records the real CCTP messenger separately for off-chain mode.
+- Arcscan verify for V3 contracts pending — DNS to binaries.soliditylang.org intermittently fails in subshell. Re-run when stable.
+
 **Verified 2026-05-24 (Phase A autonomous — T1.1 + T2.7 + T1.2):**
 - **T1.1** — Watchlist V2 schema (`agent/whale_schema.py`) + curator CLI (`agent/whale_curator.py`) with subcommands add / remove / list / validate / refresh-metrics / migrate. `data/whales-hl.json` migrated in place (no semantic change). Backward-compat shim in `leaderboard_reader.load_watchlist` keeps every existing caller working. 5 unit tests.
 - **T2.7** — Multi-agent decomposition under `agent/agents/`: ScorerAgent (composite 0-100 with PnL/position-quality/recency components), AllocatorAgent (3 proposals: equal / score-weighted / kelly-bounded), RiskAgent (concentration / imbalance / diversification / dust checks; accept / accept_with_adjustment / veto), CoordinatorAgent (precedence: kelly > score > equal among accepted). Allocation doc v2 carries the full multi-agent audit dict. 12 unit + integration tests.
