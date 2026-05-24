@@ -146,7 +146,7 @@ contract RebalanceExecutor is Ownable, Pausable, ReentrancyGuard {
         uint64  reportedAt,
         bytes32 allocationCid,
         uint16  whaleCount
-    ) external onlyOwner whenNotPaused nonReentrant returns (uint64 cctpNonce) {
+    ) external nonReentrant onlyOwner whenNotPaused returns (uint64 cctpNonce) {
         if (allocationCid == bytes32(0)) revert MissingAllocationCID();
         emit AllocationDecided(allocationCid, whaleCount, reportedAt);
 
@@ -220,7 +220,7 @@ contract RebalanceExecutor is Ownable, Pausable, ReentrancyGuard {
         uint32  minFinalityThreshold,
         bytes32 allocationCid,
         uint16  whaleCount
-    ) external onlyOwner whenNotPaused nonReentrant returns (uint256 burnId) {
+    ) external nonReentrant onlyOwner whenNotPaused returns (uint256 burnId) {
         if (allocationCid == bytes32(0)) revert MissingAllocationCID();
         emit AllocationDecided(allocationCid, whaleCount, uint64(block.timestamp));
 
@@ -278,7 +278,7 @@ contract RebalanceExecutor is Ownable, Pausable, ReentrancyGuard {
         uint64  cctpNonce,
         uint256 newNav,
         uint64  reportedAt
-    ) external onlyOwner whenNotPaused nonReentrant {
+    ) external nonReentrant onlyOwner whenNotPaused {
         PreparedBurn storage p = preparedBurns[burnId];
         if (p.allocationCid == bytes32(0)) revert UnknownBurnId();
         if (p.committed) revert AlreadyCommitted();
