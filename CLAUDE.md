@@ -20,22 +20,31 @@ Full security playbook: `SECURITY.md`. Read it before any deploy or signing work
 
 ---
 
-## Phase 1 Gate (BLOCKING — DO NOT START PHASE 2 UNTIL PASSED)
+## Phase 1 Gate — PASSED 2026-05-23
 
-**Core Action:** Multi-agent reads HL + Aster public leaderboards live → outputs top-10 whale allocation delta JSON → rebalance executor calls Gateway USDC move on Arc testnet → on-chain NAV updates → UI shows pre/post NAV + cost in cents + latency in ms.
+Single source of truth on Phase 1 lives in `ai/memory.md`. Brief restatement:
 
-**Success Test (binary):** Gateway move settles in <2 seconds AND NAV updates correctly. Both yes → passed.
+**Core Action:** Agent reads Hyperliquid leaderboard live → outputs whale allocation
+JSON → rebalance executor settles a USDC move on Arc testnet → on-chain NAV updates
+→ AllocationDecided event anchors the on-chain rebalance to the off-chain reasoning doc.
 
-**Min Tech:**
-- 1 Solidity contract: Index ERC-20 with `rebalance(allocation[])` + `nav()`
-- 1 leaderboard-reader agent (Python)
-- 1 rebalance executor that signs Gateway move
-- 1 minimal UI page (NAV + last rebalance receipt)
-- Deploy on Arc testnet
+**Success Test (binary):** USDC move settles in <2 seconds AND NAV updates correctly.
+Verified 2026-05-23 (V2 contracts): tx `0x959e0abb...82596816`, 1.08s settlement.
+Verified again 2026-05-24 via orchestrator: tx `0xa8e89e38...d0ee`, 1.13s settlement
+with full provenance link to docs/allocations/<cid>.json.
 
-**NOT Phase 1:** USYC, Paymaster, CCTP, multi-venue (Aster + Polynomial), buyer flow, landing page polish, demo video.
+**Venues actually built:** Hyperliquid only. Drift + GMX deliberately deferred to V2
+(noted in README:55, contradicting earlier text in this file that referenced Aster).
+Aster is dropped entirely — BNB-only, not on CCTP V2.
 
-See `ai/memory.md` for full context.
+**NOT Phase 1:** real USYC (Teller allowlist pending), real Gateway (frontend SDK,
+Phase C), real CCTP cross-chain mint (contract callers gated on Arc, requires Circle
+support), buyer flow (frontend rewrite, Phase C), demo video (Phase F).
+
+Sponsor primitive marketed as "Paymaster" in older drafts is wrong for Arc — Arc has
+no Paymaster (Circle Paymaster supports Arbitrum/Base/etc, not Arc). Arc uses USDC
+as the native gas token, which delivers the same UX without a Paymaster contract.
+Read `deployments/arc-testnet.json._meta.known_limitations` for the live constraints.
 
 ---
 

@@ -25,6 +25,15 @@
 
 **Status:** [V2 PASS — 2026-05-23] Phase 1 Gate proven on Arc with REAL native USDC + new safety primitives. Rebalance settles in **1.08s** (target <2s). 47 forge tests pass (up from 28).
 
+**Verified 2026-05-24 (Phase B agentic loop + Arcscan verification):**
+- `agent/orchestrator.py` wires the full pipeline as one entry point: watchlist → concurrent positions + 30d realised PnL → rank-decay filter → top-N allocation → canonical-JSON allocation doc with keccak256 CID → publish to `docs/allocations/<cid>.json` (GitHub Pages serves it publicly) → sign + submit rebalance with CID anchored on chain via AllocationDecided event → append outcome to `data/orchestrator-history.jsonl`
+- End-to-end live: tx `0xa8e89e38...d0ee` at 1.13s settlement, NAV $1.00 → $1.50, 0.3 USDC routed to Arbitrum (CCTP V2 nonce 2), AllocationDecided cid `0x7a5223a76544364104...1a5bc66b` matches doc filename exactly
+- Allocation doc: `docs/allocations/7a5223a7...66b.json`, 1.2KB canonical JSON, will be public at https://yonkoo11.github.io/whaleindex/allocations/7a5223a7...66b.json on next push
+- `--demo-allocation` flag: when watchlist returns 0 positions (placeholders), injects synthetic 1-coin allocation so submit path is testable without real whale curation. Production runs without the flag exit gracefully when no positions.
+- Real HL fill fetcher: `leaderboard_reader.fetch_pnl_window(client, wallet, days)` sums closedPnl over userFillsByTime window
+- Allocation_engine import dual-pathed (`agent.X` for module mode, plain `X` for script mode)
+- Arcscan source verification: all 7 contracts verified via Blockscout-compatible API at `https://testnet.arcscan.app/api/`. `scripts/verify-arcscan.sh` idempotent + uses absolute foundry paths so it works in subshells without sourcing profile.
+
 **Verified 2026-05-23 (Arc testnet, V2 deploy):**
 - V2 contracts at addresses in `deployments/arc-testnet.json` (under `addresses`)
 - Real native Arc USDC swapped in (`0x3600...0000`, 6-dec ERC20 interface, same balance as native gas)
