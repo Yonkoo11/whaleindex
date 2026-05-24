@@ -59,8 +59,14 @@ from agent.leaderboard_reader import (
     parse_positions,
     WhalePosition,
 )
-from agent.allocation_engine import compute_allocations, Allocation
-from agent.selection_engine import WhaleScore, evaluate, survivors
+from agent.allocation_engine import Allocation
+from agent.selection_engine import WhaleScore as DecayScore, evaluate, survivors
+from agent.agents import (
+    ScorerAgent,
+    AllocatorAgent,
+    RiskAgent,
+    CoordinatorAgent,
+)
 
 DOCS_ALLOCATIONS_DIR = REPO_ROOT / "docs" / "allocations"
 HISTORY_PATH = REPO_ROOT / "data" / "orchestrator-history.jsonl"
@@ -110,10 +116,13 @@ def _build_allocation_doc(
     allocations: list[Allocation],
     aum_usdc: float,
     pnl_window_days: int,
+    multi_agent_audit: dict[str, Any] | None = None,
+    chosen_proposal_name: str | None = None,
+    coordinator_reasoning: str | None = None,
 ) -> dict[str, Any]:
     """Canonical JSON the CID hashes over. Stable key order is enforced at write time."""
     return {
-        "version": 1,
+        "version": 2,
         "snapshot_at": int(time.time()),
         "snapshot_iso": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "aum_usdc": aum_usdc,
@@ -127,14 +136,22 @@ def _build_allocation_doc(
             for w in survivors_wallets
         ],
         "allocations": [asdict(a) for a in allocations],
+        "decision": {
+            "chosen_proposal": chosen_proposal_name,
+            "coordinator_reasoning": coordinator_reasoning,
+            "multi_agent_audit": multi_agent_audit or {},
+        },
         "method": (
-            "realised PnL ranking over window -> rank-decay filter (threshold 2 places) -> "
-            "top-N coins by aggregate signed notional from survivors -> equal weight"
+            "Hyperliquid positions + 30d realised PnL -> rank-decay eviction "
+            "-> Scorer (composite 0-100) -> Allocator (3 proposals: equal/score/kelly) "
+            "-> Risk (concentration/imbalance/diversification/dust checks) "
+            "-> Coordinator (precedence: kelly > score > equal)"
         ),
         "limitations": [
             "Realised PnL only (no unrealised). A whale with large open winning trades is undervalued.",
-            "Equal-weight across top-N coins is a heuristic, not risk-adjusted.",
-            "Direction-as-sign-of-aggregate ignores cross-whale correlation.",
+            "Risk veto bounds are heuristic, not derived from a return-distribution model.",
+            "Allocator's score-weighting uses composite score; a true Sharpe-weighted variant lands in V3.",
+            "Single-cycle decisions; no inter-cycle memory beyond rank-decay baseline.",
         ],
     }
 
@@ -204,22 +221,44 @@ async def run(
     for w in wallets:
         print(f"      {w[:10]}...  PnL ${pnl[w]:>+12,.2f}   positions={sum(1 for p in positions if p.wallet == w)}")
 
-    # Step 3: rank-decay filter
+    # Step 3: rank-decay filter (selection_engine — evicts whales whose rank fell)
     print("[3/7] rank-decay filter...")
-    scores = [WhaleScore(wallet=w, score=pnl[w]) for w in wallets]
-    decisions = evaluate(scores, decay_threshold=decay_threshold, update_baseline=not dry_run)
+    decay_scores = [DecayScore(wallet=w, score=pnl[w]) for w in wallets]
+    decisions = evaluate(decay_scores, decay_threshold=decay_threshold, update_baseline=not dry_run)
     keep = survivors(decisions)
     print(f"      survivors: {len(keep)} of {len(wallets)} whales")
     for d in decisions:
         print(f"      {d.wallet[:10]}...  {d.verdict:12s}  {d.reason}")
 
-    # Step 4: allocations from surviving whales' positions
-    print("[4/7] computing allocations from surviving whales...")
+    # Step 4: multi-agent decision (Scorer -> Allocator -> Risk -> Coordinator)
+    print("[4/7] multi-agent decision (Scorer + Allocator + Risk + Coordinator)...")
     surviving_positions = [p for p in positions if p.wallet in set(keep)]
-    allocations = compute_allocations(surviving_positions, total_aum_usdc=aum_usdc)
-    print(f"      {len(allocations)} target coins:")
-    for a in allocations:
-        print(f"      {a.coin:6s}  {a.direction:5s}  target=${a.target_notional_usd:,.2f}   ({a.rationale})")
+    surviving_pnl = {w: pnl.get(w, 0.0) for w in keep}
+
+    scorer = ScorerAgent()
+    allocator = AllocatorAgent()
+    risk = RiskAgent()
+    coordinator = CoordinatorAgent()
+
+    scored = scorer.score(keep, surviving_positions, surviving_pnl)
+    print(f"      Scorer:    {len(scored)} whales scored")
+    for s in scored[:5]:
+        print(f"        {s.wallet[:10]}...  composite={s.score:>5.1f}/100   {s.reasoning}")
+
+    proposals = allocator.propose(scored, surviving_positions, aum_usdc)
+    print(f"      Allocator: {len(proposals)} proposals")
+    for p in proposals:
+        print(f"        {p.name:18s} {len(p.allocations)} coins  ({p.reasoning})")
+
+    verdicts = risk.evaluate(proposals)
+    for v in verdicts:
+        flag = "ok" if v.verdict == "accept" else ("adj" if v.verdict == "accept_with_adjustment" else "VETO")
+        print(f"      Risk:      {v.proposal_name:18s} [{flag}]  {'; '.join(v.reasons)}")
+
+    decision = coordinator.decide(scored, proposals, verdicts)
+    print(f"      Coord:     {decision.reasoning}")
+
+    allocations: list[Allocation] = decision.chosen.allocations if decision.chosen else []
 
     if not allocations and not allow_demo_fallback:
         print("[orchestrator] no allocations produced — nothing to rebalance. exit 0.")
@@ -235,8 +274,11 @@ async def run(
             rationale="DEMO synthetic — no real whale data available (placeholders only)",
         )]
         keep = wallets  # mark all watchlist wallets as "survivors" for the doc
+        # No real audit trail when demoing; record the gap honestly.
+        decision = CoordinatorAgent().decide([], [], [])
+        decision.reasoning = "DEMO synthetic; no real agents ran. See limitations."
 
-    # Step 5: build + publish allocation document
+    # Step 5: build + publish allocation document (with full multi-agent audit trail)
     print("[5/7] building canonical allocation doc + content-hash CID...")
     doc = _build_allocation_doc(
         survivors_wallets=keep,
@@ -245,6 +287,9 @@ async def run(
         allocations=allocations,
         aum_usdc=aum_usdc,
         pnl_window_days=pnl_window_days,
+        multi_agent_audit=decision.audit,
+        chosen_proposal_name=decision.chosen.name if decision.chosen else None,
+        coordinator_reasoning=decision.reasoning,
     )
     cid = _cid_of(doc)
     out_path = _publish_allocation_doc(doc, cid)
