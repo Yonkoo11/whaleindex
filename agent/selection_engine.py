@@ -48,6 +48,7 @@ import json
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Callable
 
 REPO_ROOT = Path(__file__).parent.parent
 RANKINGS_PATH = REPO_ROOT / "data" / "whale-rankings.json"
@@ -65,8 +66,32 @@ class DecayDecision:
     prior_rank: int | None       # None if not seen before
     current_rank: int | None     # None if missing from new ranking
     decay_places: int | None     # current - prior; None if either side missing
-    verdict: str                 # "keep" | "evict_decay" | "evict_stale" | "new"
+    verdict: str                 # "keep" | "evict_decay" | "evict_stale" | "new" | "slash_pending"
     reason: str
+    slash_bps: int = 0           # 0 unless verdict == "slash_pending"
+
+
+def decay_severity_to_slash_bps(decay_places: int, max_slash_bps: int = 5000) -> int:
+    """
+    Deterministic mapping from how-far-they-fell to how-much-to-slash.
+
+    decay_places (positive = worse) is current_rank - prior_rank past the
+    threshold. The mapping is intentionally non-linear: a small slip should
+    not punish a whale much, but a sustained or catastrophic decay should
+    approach the contract's max.
+
+    Returns slash bps clamped to [0, max_slash_bps]. Returns 0 for decay <= 1
+    so a one-place slip never triggers a slash.
+    """
+    if decay_places <= 1:
+        return 0
+    if decay_places <= 3:
+        return min(500, max_slash_bps)     # 5%
+    if decay_places <= 5:
+        return min(1500, max_slash_bps)    # 15%
+    if decay_places <= 10:
+        return min(3000, max_slash_bps)    # 30%
+    return max_slash_bps                    # cap
 
 
 def _rank_scores(scores: list[WhaleScore]) -> dict[str, int]:
@@ -96,10 +121,19 @@ def evaluate(
     scores: list[WhaleScore],
     decay_threshold: int = 2,
     update_baseline: bool = True,
+    is_bonded_fn: Callable[[str], bool] | None = None,
+    max_slash_bps: int = 5000,
 ) -> list[DecayDecision]:
     """
     Compare current scores against the persisted baseline and return per-whale
     decisions. By default, the new ranking is saved as the next baseline.
+
+    is_bonded_fn: optional callable. When provided and an eviction would fire
+    on a wallet that returns True, the verdict becomes "slash_pending" instead
+    of "evict_decay" and the decision carries a non-zero slash_bps computed
+    from the decay severity. The caller (orchestrator) then performs the slash
+    on chain via WhaleAttestationClient. Unbonded whales fall through to the
+    standard evict_decay path.
 
     Pass `update_baseline=False` to dry-run without overwriting state.
     """
@@ -124,13 +158,36 @@ def evaluate(
 
         decay = current_rank - prior_rank   # positive = got worse
         if decay > decay_threshold:
+            slash_bps = 0
+            verdict = "evict_decay"
+            reason = f"rank decay {decay} > threshold {decay_threshold}"
+
+            # If the whale is bonded, promote to slash_pending so the
+            # orchestrator can perform an on-chain slash before evicting.
+            if is_bonded_fn is not None:
+                try:
+                    bonded = is_bonded_fn(wallet)
+                except Exception as e:
+                    # Adapter failure is non-fatal — fall back to standard evict.
+                    bonded = False
+                    reason += f"; is_bonded check failed: {e}"
+                if bonded:
+                    slash_bps = decay_severity_to_slash_bps(decay, max_slash_bps=max_slash_bps)
+                    if slash_bps > 0:
+                        verdict = "slash_pending"
+                        reason = (
+                            f"rank decay {decay} > threshold {decay_threshold}; "
+                            f"whale is bonded; slash_bps={slash_bps}"
+                        )
+
             decisions.append(DecayDecision(
                 wallet=wallet,
                 prior_rank=prior_rank,
                 current_rank=current_rank,
                 decay_places=decay,
-                verdict="evict_decay",
-                reason=f"rank decay {decay} > threshold {decay_threshold}",
+                verdict=verdict,
+                reason=reason,
+                slash_bps=slash_bps,
             ))
         else:
             decisions.append(DecayDecision(
@@ -164,6 +221,11 @@ def evaluate(
 def survivors(decisions: list[DecayDecision]) -> list[str]:
     """Wallets the operator should keep allocating to."""
     return [d.wallet for d in decisions if d.verdict in ("keep", "new")]
+
+
+def pending_slashes(decisions: list[DecayDecision]) -> list[DecayDecision]:
+    """Decisions where the orchestrator should perform an on-chain slash."""
+    return [d for d in decisions if d.verdict == "slash_pending" and d.slash_bps > 0]
 
 
 def _main() -> None:

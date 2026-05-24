@@ -50,6 +50,7 @@ if str(REPO_ROOT) not in sys.path:
 from agent.contract_client import (
     RebalanceArgs,
     RebalanceClient,
+    WhaleAttestationClient,
     _load_deployment,
 )
 from agent.leaderboard_reader import (
@@ -61,7 +62,13 @@ from agent.leaderboard_reader import (
     WindowMetrics,
 )
 from agent.allocation_engine import Allocation
-from agent.selection_engine import WhaleScore as DecayScore, evaluate, survivors
+from agent.selection_engine import (
+    WhaleScore as DecayScore,
+    DecayDecision,
+    evaluate,
+    survivors,
+    pending_slashes,
+)
 from agent.agents import (
     ScorerAgent,
     AllocatorAgent,
@@ -69,6 +76,39 @@ from agent.agents import (
     CoordinatorAgent,
     ReasonerAgent,
 )
+
+DOCS_SLASHES_DIR = REPO_ROOT / "docs" / "slashes"
+
+
+def _build_slash_doc(decision: DecayDecision, max_slash_bps: int) -> dict[str, Any]:
+    """Canonical JSON the slash evidence CID hashes over."""
+    return {
+        "version": 1,
+        "kind": "slash_evidence",
+        "snapshot_at": int(time.time()),
+        "snapshot_iso": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "wallet": decision.wallet,
+        "prior_rank": decision.prior_rank,
+        "current_rank": decision.current_rank,
+        "decay_places": decision.decay_places,
+        "slash_bps": decision.slash_bps,
+        "slash_bps_cap": max_slash_bps,
+        "reason": decision.reason,
+        "policy": (
+            "decay_severity_to_slash_bps: <=1 places -> 0, 2-3 -> 500, "
+            "4-5 -> 1500, 6-10 -> 3000, 11+ -> max_slash_bps"
+        ),
+    }
+
+
+def _publish_slash_doc(doc: dict[str, Any]) -> tuple[bytes, Path]:
+    """Hash + write to docs/slashes/<cid_hex>.json. Returns (cid, path)."""
+    DOCS_SLASHES_DIR.mkdir(parents=True, exist_ok=True)
+    canonical = json.dumps(doc, sort_keys=True, separators=(",", ":")).encode()
+    cid = Web3.keccak(canonical)
+    out_path = DOCS_SLASHES_DIR / f"{cid.hex()}.json"
+    out_path.write_text(json.dumps(doc, sort_keys=True, indent=2))
+    return cid, out_path
 
 DOCS_ALLOCATIONS_DIR = REPO_ROOT / "docs" / "allocations"
 HISTORY_PATH = REPO_ROOT / "data" / "orchestrator-history.jsonl"
@@ -232,14 +272,73 @@ async def run(
               f"win={m.win_rate*100:>3.0f}%  maxDD={m.max_drawdown_pct*100:>4.1f}%  "
               f"fills={m.fill_count:>3d}  positions={sum(1 for p in positions if p.wallet == w)}")
 
-    # Step 3: rank-decay filter (selection_engine — evicts whales whose rank fell)
+    # Step 3: rank-decay filter (selection_engine — evicts whales whose rank fell).
+    # If a WhaleAttestation V3 contract is deployed, bonded whales with decay
+    # > threshold are routed through the slash path instead of plain eviction.
     print("[3/7] rank-decay filter...")
+    attestation_client: WhaleAttestationClient | None = None
+    is_bonded_fn = None
+    max_slash_bps = 5000
+    if not dry_run:
+        try:
+            deployment_peek = _load_deployment(network)
+            if deployment_peek["addresses"].get("WhaleAttestation"):
+                # Build the web3 connection early so we can query bond state.
+                rpc_url_peek = _resolve_rpc_url() or deployment_peek["_meta"]["rpc"]
+                if "<arc-canteen-token>" not in rpc_url_peek:
+                    w3_peek = Web3(Web3.HTTPProvider(rpc_url_peek, request_kwargs={"timeout": 30}))
+                    if w3_peek.is_connected():
+                        attestation_client = WhaleAttestationClient.from_deployments(deployment_peek, w3_peek)
+                        max_slash_bps = attestation_client.max_slash_bps()
+                        is_bonded_fn = attestation_client.is_bonded
+                        print(f"      WhaleAttestation V3 connected: {attestation_client.address}  maxSlashBps={max_slash_bps}")
+        except Exception as e:
+            print(f"      WARN: WhaleAttestation lookup failed ({e}); proceeding without slash path")
+
     decay_scores = [DecayScore(wallet=w, score=pnl[w]) for w in wallets]
-    decisions = evaluate(decay_scores, decay_threshold=decay_threshold, update_baseline=not dry_run)
+    decisions = evaluate(
+        decay_scores,
+        decay_threshold=decay_threshold,
+        update_baseline=not dry_run,
+        is_bonded_fn=is_bonded_fn,
+        max_slash_bps=max_slash_bps,
+    )
     keep = survivors(decisions)
     print(f"      survivors: {len(keep)} of {len(wallets)} whales")
     for d in decisions:
-        print(f"      {d.wallet[:10]}...  {d.verdict:12s}  {d.reason}")
+        suffix = f"  [slash {d.slash_bps/100:.1f}%]" if d.verdict == "slash_pending" else ""
+        print(f"      {d.wallet[:10]}...  {d.verdict:14s}  {d.reason}{suffix}")
+
+    # Step 3.5: perform on-chain slashes for any slash_pending decisions.
+    slash_decisions = pending_slashes(decisions)
+    slash_receipts: list[dict[str, Any]] = []
+    if slash_decisions and attestation_client is not None and not dry_run:
+        print(f"[3.5/7] performing {len(slash_decisions)} on-chain slash(es)...")
+        for d in slash_decisions:
+            slash_doc = _build_slash_doc(d, max_slash_bps)
+            scid, spath = _publish_slash_doc(slash_doc)
+            print(f"      slash evidence cid: 0x{scid.hex()}")
+            print(f"      published: {spath.relative_to(REPO_ROOT)}")
+            try:
+                rcpt = attestation_client.slash(d.wallet, d.slash_bps, scid)
+                print(f"      → {rcpt.plain_english()}")
+                slash_receipts.append({
+                    "wallet": d.wallet,
+                    "slash_bps": d.slash_bps,
+                    "slash_amount_usdc": rcpt.slash_amount_usdc,
+                    "evidence_cid": scid.hex(),
+                    "evidence_path": str(spath.relative_to(REPO_ROOT)),
+                    "tx_hash": rcpt.tx_hash,
+                    "block_number": rcpt.block_number,
+                    "gas_used": rcpt.gas_used,
+                    "latency_seconds": rcpt.latency_seconds,
+                })
+            except Exception as e:
+                print(f"      SLASH FAILED for {d.wallet}: {e}")
+    elif slash_decisions and (attestation_client is None or dry_run):
+        print(f"[3.5/7] would slash {len(slash_decisions)} bonded whales (dry_run or no attestation client)")
+        for d in slash_decisions:
+            print(f"      {d.wallet[:10]}...  slash_bps={d.slash_bps}")
 
     # Step 4: multi-agent decision (Scorer -> Allocator -> Risk -> Coordinator)
     print("[4/7] multi-agent decision (Scorer + Allocator + Risk + Coordinator)...")
@@ -375,6 +474,7 @@ async def run(
         "usdc_routed": total_usdc_base - park_amount_usdc,
         "whale_count": len(keep),
         "cctp_mode": cctp_mode,
+        "slashes": slash_receipts,
     }
 
     if cctp_mode == "off-chain":

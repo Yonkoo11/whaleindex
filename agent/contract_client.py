@@ -440,17 +440,147 @@ class RebalanceClient:
         )
 
     def _decode_outcome(self, receipt: Any) -> tuple[int, int, int | None]:
+        """Decode NAVUpdated + Routed events to surface the post-state."""
         nav_after = 0
         routed = 0
         cctp_nonce: int | None = None
-        # errors=DISCARD silently drops logs that don't match this event's ABI
-        # (process_receipt iterates ALL logs, so non-matches are expected noise).
         for ev in self.nav_oracle.events.NAVUpdated().process_receipt(receipt, errors=DISCARD):
             nav_after = ev["args"]["nav"]
         for ev in self.router.events.Routed().process_receipt(receipt, errors=DISCARD):
             routed = ev["args"]["amount"]
             cctp_nonce = ev["args"]["nonce"]
         return nav_after, routed, cctp_nonce
+
+
+# ---------------------------------------------------------------------------
+# WhaleAttestation client — V3 slash-bond mechanism.
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class SlashReceipt:
+    tx_hash: str
+    block_number: int
+    gas_used: int
+    wallet: str
+    slash_bps: int
+    slash_amount_usdc: int
+    evidence_cid: bytes
+    latency_seconds: float
+
+    def plain_english(self) -> str:
+        return (
+            f"Slashed {self.wallet[:10]}... by {self.slash_bps/100:.1f}% "
+            f"({self.slash_amount_usdc / 1e6:.2f} USDC). "
+            f"Evidence cid: {self.evidence_cid.hex()[:12]}... "
+            f"tx: {self.tx_hash}"
+        )
+
+
+class WhaleAttestationClient:
+    """Thin signing client around the V3 WhaleAttestation contract.
+
+    The agent uses this client to:
+      - check if a whale is bonded (before tagging an eviction as slash_pending)
+      - publish a slash + record the on-chain receipt
+    """
+
+    # Minimal ABI — only what the agent actually calls.
+    ABI = [
+        {"name": "isBonded", "type": "function", "stateMutability": "view",
+         "inputs": [{"name": "wallet", "type": "address"}],
+         "outputs": [{"name": "", "type": "bool"}]},
+        {"name": "bondAmount", "type": "function", "stateMutability": "view",
+         "inputs": [{"name": "wallet", "type": "address"}],
+         "outputs": [{"name": "", "type": "uint256"}]},
+        {"name": "maxSlashBps", "type": "function", "stateMutability": "view",
+         "inputs": [], "outputs": [{"name": "", "type": "uint256"}]},
+        {"name": "slash", "type": "function", "stateMutability": "nonpayable",
+         "inputs": [
+             {"name": "wallet", "type": "address"},
+             {"name": "slashBps", "type": "uint16"},
+             {"name": "evidenceCid", "type": "bytes32"},
+         ], "outputs": []},
+        {"anonymous": False, "name": "Slashed", "type": "event",
+         "inputs": [
+             {"name": "wallet", "type": "address", "indexed": True},
+             {"name": "amount", "type": "uint256", "indexed": False},
+             {"name": "slashBps", "type": "uint16", "indexed": False},
+             {"name": "evidenceCid", "type": "bytes32", "indexed": False},
+         ]},
+    ]
+
+    def __init__(self, w3: Web3, address: str, operator_key_env_var: str = "OPERATOR_PRIVATE_KEY"):
+        self.w3 = w3
+        self.address = Web3.to_checksum_address(address)
+        self.contract = w3.eth.contract(address=self.address, abi=self.ABI)
+        self.key_env = operator_key_env_var
+
+    @classmethod
+    def from_deployments(cls, deployment: dict[str, Any], w3: Web3) -> "WhaleAttestationClient":
+        addr = deployment["addresses"].get("WhaleAttestation")
+        if not addr:
+            raise KeyError(
+                "deployment.addresses.WhaleAttestation missing — V3 not deployed?"
+            )
+        return cls(w3, addr)
+
+    def _operator_account(self) -> Any:
+        key = os.getenv(self.key_env)
+        if not key:
+            raise EnvironmentError(f"{self.key_env} not set in environment")
+        return Account.from_key(key)
+
+    def is_bonded(self, wallet: str) -> bool:
+        return bool(self.contract.functions.isBonded(Web3.to_checksum_address(wallet)).call())
+
+    def bond_amount(self, wallet: str) -> int:
+        """Returns the wallet's current bond in USDC base units (6 decimals)."""
+        return int(self.contract.functions.bondAmount(Web3.to_checksum_address(wallet)).call())
+
+    def max_slash_bps(self) -> int:
+        return int(self.contract.functions.maxSlashBps().call())
+
+    def slash(self, wallet: str, slash_bps: int, evidence_cid: bytes) -> SlashReceipt:
+        """Submit a slash. Caller must be the attestation owner (operator EOA)."""
+        if len(evidence_cid) != 32:
+            raise ValueError(f"evidence_cid must be 32 bytes, got {len(evidence_cid)}")
+        if not (0 < slash_bps < 65_536):
+            raise ValueError(f"slash_bps must be in (0, uint16-max), got {slash_bps}")
+
+        wallet_addr = Web3.to_checksum_address(wallet)
+        bond_before = self.bond_amount(wallet_addr)
+        operator = self._operator_account()
+
+        tx = self.contract.functions.slash(wallet_addr, slash_bps, evidence_cid).build_transaction({
+            "from": operator.address,
+            "nonce": self.w3.eth.get_transaction_count(operator.address),
+            "chainId": self.w3.eth.chain_id,
+            "gas": 300_000,
+        })
+        signed = operator.sign_transaction(tx)
+        t0 = time.time()
+        raw = getattr(signed, "raw_transaction", None) or getattr(signed, "rawTransaction")
+        tx_hash = self.w3.eth.send_raw_transaction(raw)
+        receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=60)
+        latency = time.time() - t0
+        if receipt["status"] != 1:
+            raise RuntimeError(f"slash reverted in tx {tx_hash.hex()}")
+
+        # The slash amount is the delta in bond_amount; faster than decoding the event.
+        bond_after = self.bond_amount(wallet_addr)
+        slash_amount = bond_before - bond_after
+
+        return SlashReceipt(
+            tx_hash=tx_hash.hex(),
+            block_number=receipt["blockNumber"],
+            gas_used=receipt["gasUsed"],
+            wallet=wallet_addr,
+            slash_bps=slash_bps,
+            slash_amount_usdc=slash_amount,
+            evidence_cid=evidence_cid,
+            latency_seconds=latency,
+        )
 
 
 def _main() -> None:
