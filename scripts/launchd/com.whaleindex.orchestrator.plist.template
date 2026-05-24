@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+WhaleIndex orchestrator — daily run.
+
+This is a TEMPLATE. The install script (scripts/launchd/install.sh)
+expands @REPO_ROOT@, @PYTHON@, @WAKEUP_HOUR@, and @AUM_USDC@ when it
+writes the final plist into ~/Library/LaunchAgents/.
+
+Schedule: runs once per day at the configured local-time hour.
+Restart: NO. KeepAlive: NO. RunAtLoad: NO. We want exactly one fire
+per day; if the run fails, the launchd error log records it and the
+next-day run is the next opportunity.
+
+Logs:
+  stdout -> @REPO_ROOT@/data/orchestrator.log
+  stderr -> @REPO_ROOT@/data/orchestrator.err
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.whaleindex.orchestrator</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>@REPO_ROOT@/scripts/orchestrate-arc.sh</string>
+        <string>--network</string>
+        <string>arc-testnet</string>
+        <string>--cctp-mode</string>
+        <string>on-chain</string>
+        <string>--aum-usdc</string>
+        <string>@AUM_USDC@</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>@REPO_ROOT@</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin:@HOME@/.foundry/bin:@HOME@/.local/bin</string>
+        <key>HOME</key>
+        <string>@HOME@</string>
+    </dict>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>@WAKEUP_HOUR@</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>@REPO_ROOT@/data/orchestrator.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>@REPO_ROOT@/data/orchestrator.err</string>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+
+    <key>Nice</key>
+    <integer>10</integer>
+</dict>
+</plist>
