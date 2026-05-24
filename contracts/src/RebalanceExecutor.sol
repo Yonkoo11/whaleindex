@@ -35,6 +35,25 @@ contract RebalanceExecutor is Ownable, Pausable {
     uint256 public dayBucket;       // block.timestamp / 1 days at last update
     uint256 public spentToday;      // USDC moved cross-chain today
 
+    /// Auto-incrementing id assigned to every off-chain CCTP burn.
+    /// Lets the off-chain operator + indexer pair `prepareRebalance` and
+    /// `commitRebalance` calls deterministically.
+    uint256 public nextBurnId;
+
+    /// burnId -> (route amount + dest + recipient + fee + finality + cid) snapshot.
+    /// Indexers can read this to verify the burn that the operator EOA performs
+    /// off-chain matches what the executor staged on chain.
+    struct PreparedBurn {
+        uint256 amount;
+        uint32  destinationDomain;
+        bytes32 mintRecipient;
+        uint256 maxFee;
+        uint32  minFinalityThreshold;
+        bytes32 allocationCid;
+        bool    committed;
+    }
+    mapping(uint256 => PreparedBurn) public preparedBurns;
+
     event PolicyChanged(uint256 maxSingleMove, uint256 dailyCap);
     event RebalanceExecuted(
         uint32  indexed destinationDomain,
@@ -51,10 +70,35 @@ contract RebalanceExecutor is Ownable, Pausable {
         uint16  whaleCount,
         uint64  reportedAt
     );
+    /// Emitted by `prepareRebalance` so the off-chain operator EOA listener
+    /// can capture the staged burn parameters and immediately sign CCTP V2
+    /// `depositForBurn` from the operator wallet (which Arc CCTP accepts —
+    /// unlike contract callers, which it silently reverts on).
+    event BurnPrepared(
+        uint256 indexed burnId,
+        address indexed operator,
+        uint256 amount,
+        uint32  destinationDomain,
+        bytes32 mintRecipient,
+        uint256 maxFee,
+        uint32  minFinalityThreshold,
+        bytes32 allocationCid
+    );
+    /// Emitted when the off-chain CCTP burn lands and the operator commits the
+    /// resulting nonce + new NAV on chain. Indexers tie the off-chain CCTP
+    /// `DepositForBurn` event (nonce) to this on-chain commit.
+    event RebalanceCommitted(
+        uint256 indexed burnId,
+        uint64  cctpNonce,
+        uint256 navAfter,
+        uint64  reportedAt
+    );
 
     error PolicyExceededSingle();
     error PolicyExceededDaily();
     error MissingAllocationCID();
+    error UnknownBurnId();
+    error AlreadyCommitted();
 
     constructor(
         address usdc_,
@@ -145,5 +189,101 @@ contract RebalanceExecutor is Ownable, Pausable {
         uint256 newSpent = spentToday + amount;
         if (newSpent > policy.dailyCap) revert PolicyExceededDaily();
         spentToday = newSpent;
+    }
+
+    // ------------------------------------------------------------------
+    // Off-chain CCTP path — two-step: prepareRebalance + commitRebalance.
+    //
+    // Why: Arc CCTP TokenMessenger silently reverts on contract callers.
+    // Verified via CCTPProbe at 0xe4F6a70a...3B913F6 — EOA depositForBurn
+    // works (tx 0x24f2b089...01c2cf95a burned 0.1 USDC to Arbitrum), the
+    // identical call from a contract reverts with no error data.
+    //
+    // The two-step flow keeps policy + provenance + park on chain. Only
+    // the CCTP burn moves off chain: prepareRebalance transfers USDC to
+    // the operator EOA (msg.sender), emits BurnPrepared with the staged
+    // params; the operator EOA then signs depositForBurn directly; the
+    // operator finally calls commitRebalance with the resulting CCTP nonce
+    // so the on-chain NAV reflects the actual cross-chain settlement.
+    // ------------------------------------------------------------------
+
+    function prepareRebalance(
+        uint256 totalUsdcAmount,
+        uint256 parkAmount,
+        uint32  destinationDomain,
+        bytes32 mintRecipient,
+        uint256 maxFee,
+        uint32  minFinalityThreshold,
+        bytes32 allocationCid,
+        uint16  whaleCount
+    ) external onlyOwner whenNotPaused returns (uint256 burnId) {
+        if (allocationCid == bytes32(0)) revert MissingAllocationCID();
+        emit AllocationDecided(allocationCid, whaleCount, uint64(block.timestamp));
+
+        _checkAndAccrue(totalUsdcAmount);
+
+        // Pull USDC from index into this executor.
+        index.withdrawForRebalance(address(this), totalUsdcAmount);
+
+        // Park residual idle USDC in USYC for yield (same path as one-shot rebalance).
+        if (parkAmount > 0) {
+            usdc.forceApprove(address(park), parkAmount);
+            park.park(parkAmount);
+        }
+
+        uint256 routeAmount = totalUsdcAmount - parkAmount;
+        if (routeAmount > 0) {
+            // Transfer routing USDC to the operator EOA. From here, the operator
+            // signs depositForBurn directly against the real CCTP TokenMessenger.
+            usdc.safeTransfer(msg.sender, routeAmount);
+        }
+
+        burnId = ++nextBurnId;
+        preparedBurns[burnId] = PreparedBurn({
+            amount: routeAmount,
+            destinationDomain: destinationDomain,
+            mintRecipient: mintRecipient,
+            maxFee: maxFee,
+            minFinalityThreshold: minFinalityThreshold,
+            allocationCid: allocationCid,
+            committed: false
+        });
+
+        emit BurnPrepared(
+            burnId,
+            msg.sender,
+            routeAmount,
+            destinationDomain,
+            mintRecipient,
+            maxFee,
+            minFinalityThreshold,
+            allocationCid
+        );
+    }
+
+    /// Commits the result of the off-chain CCTP burn: records the actual
+    /// nonce emitted by TokenMessenger and updates NAV.
+    /// Operator must call after the depositForBurn tx confirms.
+    function commitRebalance(
+        uint256 burnId,
+        uint64  cctpNonce,
+        uint256 newNav,
+        uint64  reportedAt
+    ) external onlyOwner whenNotPaused {
+        PreparedBurn storage p = preparedBurns[burnId];
+        if (p.allocationCid == bytes32(0)) revert UnknownBurnId();
+        if (p.committed) revert AlreadyCommitted();
+
+        p.committed = true;
+        navOracle.updateNAV(newNav, reportedAt);
+
+        emit RebalanceCommitted(burnId, cctpNonce, newNav, reportedAt);
+        emit RebalanceExecuted(
+            p.destinationDomain,
+            p.mintRecipient,
+            p.amount,
+            newNav,
+            reportedAt
+        );
     }
 }

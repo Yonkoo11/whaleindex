@@ -206,6 +206,7 @@ async def run(
     new_nav_usdc: int,
     park_amount_usdc: int,
     allow_demo_fallback: bool = False,
+    cctp_mode: str = "on-chain",
 ) -> int:
     print(f"[orchestrator] network={network} aum=${aum_usdc:,.2f} pnl_window={pnl_window_days}d dry_run={dry_run}")
 
@@ -302,8 +303,8 @@ async def run(
         print("[7/7] DRY RUN — skipping history append")
         return 0
 
-    # Step 6: submit rebalance
-    print(f"[6/7] submitting rebalance to {network}...")
+    # Step 6: submit rebalance (mode-dispatched)
+    print(f"[6/7] submitting rebalance to {network} (cctp_mode={cctp_mode})...")
     key = _resolve_operator_key()
     rpc_url = _resolve_rpc_url()
     deployment = _load_deployment(network)
@@ -322,8 +323,6 @@ async def run(
     client = RebalanceClient(w3, deployment)
     operator_addr = Account.from_key(key).address
 
-    # Compute a single rebalance — total AUM routed to DEFAULT_DESTINATION_DOMAIN.
-    # V2 limit: one CCTP move per cycle. V3: per-allocation routing.
     total_usdc_base = sum(int(a.target_notional_usd * 1_000_000) for a in allocations)
 
     args = RebalanceArgs(
@@ -338,31 +337,64 @@ async def run(
         whale_count=len(keep),
     )
 
-    receipt = client.send_rebalance(args)
-    print(f"      tx: {receipt.tx_hash}")
-    print(f"      latency: {receipt.latency_seconds:.2f}s")
-    print(f"      NAV: ${receipt.nav_before_usdc/1e6:.4f} -> ${receipt.nav_after_usdc/1e6:.4f}")
-    print(f"      routed: ${receipt.usdc_routed/1e6:.4f} to Arbitrum (CCTP nonce {receipt.cctp_nonce})")
-    print(f"      gas: {receipt.gas_used:,}")
-
-    # Step 7: history
-    print("[7/7] appending outcome to history...")
-    _append_history({
+    history_row = {
         "ts": int(time.time()),
         "network": network,
         "cid": cid.hex(),
         "allocation_doc_path": str(out_path.relative_to(REPO_ROOT)),
-        "tx_hash": receipt.tx_hash,
-        "block_number": receipt.block_number,
-        "latency_seconds": receipt.latency_seconds,
-        "nav_before_usdc": receipt.nav_before_usdc,
-        "nav_after_usdc": receipt.nav_after_usdc,
-        "usdc_routed": receipt.usdc_routed,
-        "destination_domain": receipt.destination_domain,
-        "cctp_nonce": receipt.cctp_nonce,
-        "gas_used": receipt.gas_used,
+        "destination_domain": args.destination_domain,
+        "usdc_routed": total_usdc_base - park_amount_usdc,
         "whale_count": len(keep),
-    })
+        "cctp_mode": cctp_mode,
+    }
+
+    if cctp_mode == "off-chain":
+        # Read real TokenMessenger from deployment metadata.
+        meta = deployment.get("_meta", {})
+        canon = meta.get("canonical_arc_addresses_referenced_but_not_called", {})
+        real_messenger = canon.get("TokenMessengerV2")
+        if not real_messenger:
+            raise RuntimeError(
+                "off-chain mode requires _meta.canonical_arc_addresses_referenced_but_not_called.TokenMessengerV2 in the deployment file"
+            )
+        print(f"      real CCTP TokenMessenger: {real_messenger}")
+        offchain_receipt = client.send_rebalance_offchain_cctp(args, real_messenger)
+        print(f"      prepare tx: {offchain_receipt.prepare_tx_hash}")
+        print(f"      burn tx:    {offchain_receipt.burn_tx_hash}")
+        print(f"      commit tx:  {offchain_receipt.commit_tx_hash}")
+        print(f"      burn id:    {offchain_receipt.burn_id}")
+        print(f"      total latency: {offchain_receipt.total_latency_seconds:.2f}s (3-tx flow)")
+        print(f"      NAV: ${offchain_receipt.nav_before_usdc/1e6:.4f} -> ${offchain_receipt.nav_after_usdc/1e6:.4f}")
+        print(f"      routed: ${offchain_receipt.usdc_routed/1e6:.4f} via REAL CCTP nonce {offchain_receipt.cctp_nonce}")
+        history_row.update({
+            "prepare_tx_hash": offchain_receipt.prepare_tx_hash,
+            "burn_tx_hash": offchain_receipt.burn_tx_hash,
+            "commit_tx_hash": offchain_receipt.commit_tx_hash,
+            "burn_id": offchain_receipt.burn_id,
+            "cctp_nonce": offchain_receipt.cctp_nonce,
+            "total_latency_seconds": offchain_receipt.total_latency_seconds,
+            "nav_before_usdc": offchain_receipt.nav_before_usdc,
+            "nav_after_usdc": offchain_receipt.nav_after_usdc,
+        })
+    else:
+        receipt = client.send_rebalance(args)
+        print(f"      tx: {receipt.tx_hash}")
+        print(f"      latency: {receipt.latency_seconds:.2f}s")
+        print(f"      NAV: ${receipt.nav_before_usdc/1e6:.4f} -> ${receipt.nav_after_usdc/1e6:.4f}")
+        print(f"      routed: ${receipt.usdc_routed/1e6:.4f} to Arbitrum (mock CCTP nonce {receipt.cctp_nonce})")
+        print(f"      gas: {receipt.gas_used:,}")
+        history_row.update({
+            "tx_hash": receipt.tx_hash,
+            "block_number": receipt.block_number,
+            "latency_seconds": receipt.latency_seconds,
+            "nav_before_usdc": receipt.nav_before_usdc,
+            "nav_after_usdc": receipt.nav_after_usdc,
+            "cctp_nonce": receipt.cctp_nonce,
+            "gas_used": receipt.gas_used,
+        })
+
+    print("[7/7] appending outcome to history...")
+    _append_history(history_row)
     print("[orchestrator] done.")
     return 0
 
@@ -384,6 +416,10 @@ def main() -> int:
     parser.add_argument("--demo-allocation", action="store_true",
                         help="If watchlist returns no positions (e.g. placeholder addresses), "
                              "inject a synthetic 1-coin allocation so the submit path is testable.")
+    parser.add_argument("--cctp-mode", choices=["on-chain", "off-chain"], default="on-chain",
+                        help="on-chain: single-tx rebalance via the deployed (currently Mock) CCTPRouter. "
+                             "off-chain: 3-tx flow that sidesteps Arc's contract-caller gate: "
+                             "prepareRebalance -> operator EOA signs real depositForBurn -> commitRebalance.")
     args = parser.parse_args()
     return asyncio.run(run(
         network=args.network,
@@ -394,6 +430,7 @@ def main() -> int:
         new_nav_usdc=args.new_nav_usdc,
         park_amount_usdc=args.park_usdc,
         allow_demo_fallback=args.demo_allocation,
+        cctp_mode=args.cctp_mode,
     ))
 
 
