@@ -67,6 +67,7 @@ from agent.agents import (
     AllocatorAgent,
     RiskAgent,
     CoordinatorAgent,
+    ReasonerAgent,
 )
 
 DOCS_ALLOCATIONS_DIR = REPO_ROOT / "docs" / "allocations"
@@ -122,6 +123,7 @@ def _build_allocation_doc(
     multi_agent_audit: dict[str, Any] | None = None,
     chosen_proposal_name: str | None = None,
     coordinator_reasoning: str | None = None,
+    human_reasoning: str | None = None,
 ) -> dict[str, Any]:
     """Canonical JSON the CID hashes over. Stable key order is enforced at write time."""
     return {
@@ -142,6 +144,7 @@ def _build_allocation_doc(
         "decision": {
             "chosen_proposal": chosen_proposal_name,
             "coordinator_reasoning": coordinator_reasoning,
+            "human_reasoning": human_reasoning or "(no LLM key configured — set ANTHROPIC_API_KEY to populate)",
             "multi_agent_audit": multi_agent_audit or {},
         },
         "method": (
@@ -287,8 +290,25 @@ async def run(
         decision = CoordinatorAgent().decide([], [], [])
         decision.reasoning = "DEMO synthetic; no real agents ran. See limitations."
 
-    # Step 5: build + publish allocation document (with full multi-agent audit trail)
+    # Step 5: optional LLM reasoning + build + publish allocation document.
     print("[5/7] building canonical allocation doc + content-hash CID...")
+    human_reasoning: str | None = None
+    if os.getenv("ANTHROPIC_API_KEY"):
+        print("      ANTHROPIC_API_KEY set — generating human-readable explanation via Claude...")
+        try:
+            human_reasoning = ReasonerAgent().explain(
+                audit=decision.audit,
+                chosen_proposal_name=decision.chosen.name if decision.chosen else None,
+                coordinator_reasoning=decision.reasoning,
+                aum_usdc=aum_usdc,
+            )
+            if human_reasoning:
+                print(f"      reasoning ({len(human_reasoning)} chars): {human_reasoning[:120]}...")
+        except Exception as e:
+            print(f"      WARN: ReasonerAgent failed ({e}); proceeding without LLM reasoning")
+    else:
+        print("      (no ANTHROPIC_API_KEY — skipping LLM reasoning, audit-only doc)")
+
     doc = _build_allocation_doc(
         survivors_wallets=keep,
         positions=positions,
@@ -299,6 +319,7 @@ async def run(
         multi_agent_audit=decision.audit,
         chosen_proposal_name=decision.chosen.name if decision.chosen else None,
         coordinator_reasoning=decision.reasoning,
+        human_reasoning=human_reasoning,
     )
     cid = _cid_of(doc)
     out_path = _publish_allocation_doc(doc, cid)

@@ -14,10 +14,12 @@ from .scorer import ScorerAgent, WhaleScore, ScoreComponents
 from .allocator import AllocatorAgent, AllocationProposal
 from .risk import RiskAgent, RiskVerdict, RiskPolicy
 from .coordinator import CoordinatorAgent, FinalDecision
+from .reasoner import ReasonerAgent
 
 __all__ = [
     "ScorerAgent", "WhaleScore", "ScoreComponents",
     "AllocatorAgent", "AllocationProposal",
     "RiskAgent", "RiskVerdict", "RiskPolicy",
     "CoordinatorAgent", "FinalDecision",
+    "ReasonerAgent",
 ]
