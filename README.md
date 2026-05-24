@@ -2,6 +2,8 @@
 
 **A USDC-denominated index on Arc that mirrors top Hyperliquid whales, with on-chain provenance for every rebalance decision.** An off-chain agent reads each whale's positions + 30-day realised PnL, applies a rank-decay filter, computes allocations, publishes a canonical JSON reasoning document, hashes it, and submits a rebalance whose on-chain event is anchored to that hash. Anyone can click from the tx on Arcscan to the agent's reasoning.
 
+**Live demo:** [yonkoo11.github.io/whaleindex](https://yonkoo11.github.io/whaleindex/) — reads Arc Testnet via a keyless public RPC. No wallet needed. Shows the live NAV, the most recent rebalance (with both Arcscan tx link and reasoning-doc link), and an Arc-vs-Arbitrum-vs-Ethereum cost/latency comparison.
+
 Built for the [Agora Agents Hackathon](https://agora.thecanteenapp.com) (Canteen × Circle × Arc, 2026-05-11 → 2026-05-25). Targets **RFB 06 — Social Trading Intelligence** primary, RFB 04 (Adaptive Portfolio Manager) secondary.
 
 ## What works today (verified live on Arc testnet)

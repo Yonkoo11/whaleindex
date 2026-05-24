@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  forge-test:
+    name: forge test
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Show forge version
+        run: forge --version
+
+      - name: Build
+        working-directory: contracts
+        run: forge build --sizes
+
+      - name: Test
+        working-directory: contracts
+        run: forge test -vv
+
+  agent-imports:
+    name: agent imports + dry-run pipeline
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install agent deps
+        run: pip install -r agent/requirements.txt
+
+      - name: Import-check every agent module
+        run: |
+          python -c "
+          import importlib
+          for m in ['agent.leaderboard_reader', 'agent.allocation_engine',
+                   'agent.selection_engine', 'agent.contract_client',
+                   'agent.orchestrator']:
+              importlib.import_module(m)
+              print(f'OK: {m}')
+          "
+
+      - name: Sanity-check orchestrator argparse
+        run: python -m agent.orchestrator --help
