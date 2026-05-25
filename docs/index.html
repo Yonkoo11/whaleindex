@@ -1219,7 +1219,7 @@ async function refreshState(prov){
     const spNum=Number(formatUnits(sp,6));
     setHTML($("#navKpi"), priceMarkup(spNum.toFixed(4)));
     setHTML($("#navPrice"), priceMarkup(spNum.toFixed(4)));
-    setText($("#navAum"),"NAV $"+fmtUsd(navUsdc,6,2));
+    setText($("#navAum"),"total NAV $"+fmtUsd(navUsdc,6,2));
     const fr=$("#navFresh");
     if(isFresh){ fr.textContent="oracle fresh · "+fmtAgo((Date.now()/1000)-Number(updatedAt)); fr.className="nav-sub fresh"; }
     else if(updatedAt>0n){ fr.textContent="stale · last "+new Date(Number(updatedAt)*1000).toLocaleString(); fr.className="nav-sub stale"; }
@@ -1239,7 +1239,7 @@ async function refreshRebalance(prov,latest){
   const exec=new Contract(ARC.addresses.RebalanceExecutor, ABI_EXEC, prov);
   const alloc=await findLatestEvent(exec,"AllocationDecided",latest);
   const settleEl=$("#rebalSettle");
-  if(!alloc){ if(settleEl) setText(settleEl,"no on-chain rebalance yet"); setText($("#chainArcVal"),"—"); return; }
+  if(!alloc){ if(settleEl){ setText(settleEl,"n/a"); settleEl.title="No on-chain rebalance this cycle — the agent held."; } setText($("#chainArcVal"),"—"); return; }
   const reportedAt=Number(alloc.args.reportedAt);
   const txHash=alloc.transactionHash;
   try{
