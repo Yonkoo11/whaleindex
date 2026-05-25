@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html lang="en">
+<!--
+================================================================================
+WhaleIndex — Proposal 3: "THE PIPELINE"
+DNA: DNA-B-T-I-M-S
+  Layout       = Bento (varied cells; the pipeline is a wide feature cell)
+  Navigation   = Top-fixed
+  Hero         = Immersive (the live 4-node agent pipeline IS the hero centerpiece)
+  Color        = Monochrome (single teal #00d4aa + charcoal neutrals; red ONLY for veto)
+  Typography   = Sans (DM Sans body + JetBrains Mono numbers; NO serif)
+
+CONCEPT
+  The autonomous multi-agent decision chain (Scorer -> Allocator -> Risk ->
+  Coordinator) is the signature visual and the centerpiece of the page. A
+  restrained, precise mission-console aesthetic: calm cockpit, not neon
+  cyberpunk. Everything around the pipeline is quiet so the pipeline reads as
+  striking. The hero is the live pipeline with the REAL decision flowing
+  through it: this cycle the Risk node VETOED all proposals and the
+  Coordinator HELD. The veto node is the only red on the page.
+
+UX ARCHITECTURE (3 surfaces, one scrollable page)
+  1. HERO = immersive live pipeline. Top-fixed nav carries the NAV KPI inline.
+     Four nodes connected by hairlines with a subtle ambient shimmer that flows
+     along the connectors (Scorer green -> Allocator green -> Risk RED veto ->
+     Coordinator HELD). Each node is a keyboard-navigable button; clicking/
+     Enter opens a right slide-in detail panel with that agent's full reasoning
+     rendered from the real decision-latest.json. prefers-reduced-motion kills
+     the shimmer.
+  2. DASHBOARD = bento grid below, varied cell sizes (NOT an identical card
+     grid), hairline separation:
+       - NAV KPI cell: integer-emphasised mono price, de-emphasised $/decimals,
+         40px axis-less sparkline, +/- trend pill.
+       - "Since last rebalance" delta strip: "0 changes . agent held .
+         reasoning anchored [check]".
+       - Decision-record cell: raw JSON one click away + LIVE in-browser hash
+         recompute beat ("your browser just verified this") with #00d4aa check.
+       - Chain cost/latency compare cell: Arc 1.13s / ~$0.0005 vs Arbitrum vs
+         Ethereum (honest mini bar compare).
+       - Bonded-whale attestation cell: HONEST empty state (0 bonded, designed
+         intentional, NOT "$0").
+       - Verified contracts cell: click-to-copy truncated addresses + green
+         check, real Arc testnet V2 addresses.
+     Per-widget independent loading: each cell flips skeleton->content on its
+     own timer (Dune answer->trend->proof descent), slowest never blocks NAV.
+  3. BUYER FLOW = top-nav "Connect" opens a right slide-in panel. Buy/Redeem
+     segmented control, on-BLUR validation (not per keystroke), 16px input,
+     live estimated shares, confirm -> settling (live ms counter, Arc
+     sub-second flex) -> calm checkmark (NO confetti).
+
+STATES SHOWN
+  per-widget skeletons (layout-matched) -> content cross-fade; the no-trade
+  decision as the live pipeline state; node-detail panels; an error/retry band
+  demo (toggle in footer); honest empty attestation; buyer success.
+
+FAKED / SIMULATED STATE (honest disclosure)
+  - NAV ($1.0432), sparkline series, and the chain cost/latency comparison bars
+    are illustrative placeholders (no live RPC in a static file). Marked with a
+    "demo data" pill where shown.
+  - The buyer flow settlement timer is a simulated countdown (no wallet/RPC).
+  - Loading skeletons run on demo timers to demonstrate per-widget loading.
+  - Everything in the PIPELINE + decision record (scores, proposals, veto
+    reasons, coordinator verdict, cid hash) is the REAL decision-latest.json.
+  - The in-browser hash check recomputes a digest over the embedded decision
+    object live; the embedded cid is the real anchored value.
+
+ACCESSIBILITY
+  4.5:1+ contrast, focus rings via box-shadow, 44px targets, aria-labels on
+  icon buttons + nodes, semantic buttons, labeled inputs (16px font), fully
+  keyboard-navigable pipeline (Tab + Enter/Space, Esc closes panels).
+
+INSPIRATION
+  Linear (motion craft) + Dune (widget/data density) + a restrained
+  mission-console aesthetic.
+================================================================================
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WhaleIndex — The Pipeline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:        #0b0d0e;
+  --bg-raise:  #101315;
+  --bg-cell:   #0e1113;
+  --bg-inset:  #14181a;
+  --hair:      rgba(255,255,255,0.075);
+  --hair-soft: rgba(255,255,255,0.05);
+  --hair-strong: rgba(255,255,255,0.13);
+  --ink:       rgba(255,255,255,0.95);
+  --ink-2:     rgba(255,255,255,0.66);
+  --ink-3:     rgba(255,255,255,0.42);
+  --ink-4:     rgba(255,255,255,0.30);
+  --teal:      #00d4aa;
+  --teal-soft: rgba(0,212,170,0.14);
+  --teal-line: rgba(0,212,170,0.40);
+  --teal-dim:  rgba(0,212,170,0.62);
+  --veto:      #ff5d5d;
+  --veto-soft: rgba(255,93,93,0.12);
+  --veto-line: rgba(255,93,93,0.42);
+  --r-sm: 4px;
+  --r-md: 7px;
+  --r-lg: 10px;
+  --ease: cubic-bezier(0.22,1,0.36,1);
+  --t-fast: 150ms var(--ease);
+  --t-panel: 200ms var(--ease);
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --sans: "DM Sans", system-ui, sans-serif;
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font-family:var(--sans);font-size:14px;line-height:1.5;
+  letter-spacing:-0.011em;font-weight:400;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+}
+body::before{
+  content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(120% 70% at 50% -10%, rgba(0,212,170,0.05), transparent 60%),
+    radial-gradient(90% 60% at 50% 120%, rgba(255,255,255,0.018), transparent 70%);
+}
+.app{position:relative;z-index:1;}
+h1,h2,h3{margin:0;font-weight:600;letter-spacing:-0.022em;}
+button{font-family:inherit;cursor:pointer;}
+a{color:inherit;}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums;}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-0.01em;}
+.label{font-size:12px;text-transform:uppercase;letter-spacing:0.12em;font-weight:500;color:var(--ink-3);}
+:focus-visible{outline:none;box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--teal-line);}
+
+.dna-badge{
+  position:fixed;top:14px;right:16px;z-index:120;
+  font-family:var(--mono);font-size:11px;letter-spacing:0.14em;color:var(--teal-dim);
+  background:rgba(11,13,14,0.8);border:1px solid var(--teal-line);border-radius:999px;
+  padding:6px 11px;backdrop-filter:blur(8px);pointer-events:none;
+}
+
+.nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;height:60px;
+  display:flex;align-items:center;gap:22px;padding:0 24px;
+  background:rgba(11,13,14,0.78);border-bottom:1px solid var(--hair);backdrop-filter:blur(14px);
+}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600;letter-spacing:-0.02em;font-size:15px;}
+.brand .mark{width:22px;height:22px;flex:none;}
+.brand .mark svg{display:block;}
+.nav-kpi{display:flex;align-items:baseline;gap:8px;margin-left:6px;padding-left:18px;border-left:1px solid var(--hair);}
+.nav-kpi .k-label{font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-4);font-weight:500;}
+.nav-kpi .k-val{font-family:var(--mono);font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink);}
+.nav-kpi .k-val .sym,.nav-kpi .k-val .dec{opacity:0.55;}
+.nav-kpi .k-trend{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--teal);letter-spacing:0.02em;}
+.nav-spacer{flex:1;}
+.nav-links{display:flex;gap:4px;}
+.nav-links a{font-size:13px;color:var(--ink-2);text-decoration:none;padding:8px 11px;border-radius:var(--r-sm);font-weight:500;transition:color var(--t-fast),background var(--t-fast);}
+.nav-links a:hover{color:var(--ink);background:rgba(255,255,255,0.04);}
+.connect-btn{display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:0 15px;border-radius:var(--r-md);background:var(--teal-soft);border:1px solid var(--teal-line);color:var(--teal);font-weight:600;font-size:13px;letter-spacing:-0.01em;transition:background var(--t-fast),transform var(--t-fast);}
+.connect-btn:hover{background:rgba(0,212,170,0.2);}
+.connect-btn:active{transform:translateY(1px);}
+.connect-btn .dot{width:6px;height:6px;border-radius:50%;background:var(--teal);}
+
+.wrap{max-width:1160px;margin:0 auto;padding:0 24px;}
+.section-eyebrow{display:flex;align-items:center;gap:12px;margin-bottom:18px;}
+.section-eyebrow .rule{height:1px;flex:1;background:var(--hair);}
+
+.hero{padding:104px 0 30px;}
+.hero-head{max-width:680px;margin-bottom:34px;}
+.hero-kicker{display:inline-flex;align-items:center;gap:9px;font-family:var(--mono);font-size:12px;letter-spacing:0.08em;color:var(--teal-dim);border:1px solid var(--teal-line);border-radius:999px;padding:5px 12px;margin-bottom:20px;}
+.hero-kicker .pulse{width:7px;height:7px;border-radius:50%;background:var(--teal);position:relative;}
+.hero-kicker .pulse::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:1px solid var(--teal-line);animation:ring 2.6s var(--ease) infinite;}
+@keyframes ring{0%{transform:scale(0.6);opacity:0.9;}100%{transform:scale(1.9);opacity:0;}}
+.hero h1{font-size:38px;line-height:1.08;margin-bottom:14px;}
+.hero h1 .muted{color:var(--ink-3);font-weight:600;}
+.hero-sub{font-size:15px;color:var(--ink-2);line-height:1.55;max-width:600px;}
+.hero-verdict-line{margin-top:18px;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font-size:13px;color:var(--ink-2);}
+.verdict-chip{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:12px;letter-spacing:0.04em;padding:5px 10px;border-radius:var(--r-sm);border:1px solid var(--hair-strong);background:var(--bg-inset);color:var(--ink);}
+.verdict-chip.held{border-color:var(--teal-line);color:var(--teal);background:var(--teal-soft);}
+.verdict-chip svg{width:13px;height:13px;}
+
+.pipeline-cell{position:relative;border:1px solid var(--hair);border-radius:var(--r-lg);background:linear-gradient(180deg,var(--bg-raise),var(--bg-cell));padding:30px 30px 26px;overflow:hidden;}
+.pipeline-cell::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:0.5;background-image:linear-gradient(rgba(255,255,255,0.014) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.014) 1px,transparent 1px);background-size:34px 34px;mask-image:radial-gradient(120% 100% at 50% 0%,#000,transparent 78%);-webkit-mask-image:radial-gradient(120% 100% at 50% 0%,#000,transparent 78%);}
+.pipeline-top{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:22px;position:relative;z-index:2;}
+.pipeline-top .ptitle{display:flex;align-items:center;gap:11px;}
+.pipeline-top .ptitle h2{font-size:15px;}
+.cycle-meta{display:flex;gap:18px;align-items:center;font-family:var(--mono);font-size:12px;color:var(--ink-3);}
+.cycle-meta b{color:var(--ink-2);font-weight:500;}
+.pipeline{position:relative;z-index:2;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0;}
+.node{position:relative;display:flex;flex-direction:column;gap:11px;text-align:left;background:var(--bg-cell);border:1px solid var(--hair-strong);border-radius:var(--r-md);padding:15px 15px 14px;margin:0 14px;color:inherit;transition:border-color var(--t-fast),transform var(--t-fast),background var(--t-fast);}
+.node:hover{transform:translateY(-3px);border-color:var(--teal-line);background:var(--bg-inset);}
+.node:focus-visible{border-color:var(--teal-line);}
+.node.is-veto{border-color:var(--veto-line);background:rgba(255,93,93,0.05);}
+.node.is-veto:hover{background:rgba(255,93,93,0.09);border-color:var(--veto);}
+.node-head{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.node-stage{display:flex;align-items:center;gap:8px;}
+.node-num{width:20px;height:20px;flex:none;border-radius:5px;display:grid;place-items:center;font-family:var(--mono);font-size:11px;font-weight:600;background:var(--teal-soft);color:var(--teal);border:1px solid var(--teal-line);}
+.node.is-veto .node-num{background:var(--veto-soft);color:var(--veto);border-color:var(--veto-line);}
+.node-name{font-size:13px;font-weight:600;letter-spacing:-0.012em;}
+.node-status{font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;padding:3px 6px;border-radius:3px;font-weight:600;background:var(--teal-soft);color:var(--teal);}
+.node.is-veto .node-status{background:var(--veto-soft);color:var(--veto);}
+.node-summary{font-size:12.5px;color:var(--ink-2);line-height:1.45;min-height:34px;}
+.node-metric{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding-top:11px;border-top:1px solid var(--hair-soft);}
+.node-metric .m-label{font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-4);font-weight:500;}
+.node-metric .m-val{font-family:var(--mono);font-size:16px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink);letter-spacing:-0.01em;}
+.node.is-veto .m-val{color:var(--veto);}
+.node-cta{font-family:var(--mono);font-size:11px;color:var(--ink-4);letter-spacing:0.04em;display:flex;align-items:center;gap:5px;}
+.node:hover .node-cta{color:var(--teal-dim);}
+.node.is-veto:hover .node-cta{color:var(--veto);}
+.connector{position:absolute;z-index:1;top:50%;height:2px;pointer-events:none;}
+.connector .base{position:absolute;inset:0;background:var(--hair-strong);}
+.connector .flow{position:absolute;top:0;height:100%;width:42px;border-radius:2px;background:linear-gradient(90deg,transparent,var(--teal),transparent);opacity:0.9;animation:flow 3.4s linear infinite;}
+.connector.c-veto .flow{background:linear-gradient(90deg,transparent,var(--veto),transparent);}
+@keyframes flow{from{transform:translateX(-46px);}to{transform:translateX(var(--flow-end,100%));}}
+.connector .arrow{position:absolute;right:-1px;top:50%;transform:translateY(-50%);color:var(--hair-strong);}
+.connector.c-veto .arrow{color:var(--veto-line);}
+.pipeline-foot{position:relative;z-index:2;margin-top:20px;padding-top:16px;border-top:1px solid var(--hair-soft);display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;justify-content:space-between;font-family:var(--mono);font-size:12px;color:var(--ink-3);}
+.pipeline-foot .anchored{display:flex;align-items:center;gap:8px;color:var(--ink-2);}
+.pipeline-foot .cid{color:var(--teal-dim);}
+
+.dash{padding:46px 0 20px;}
+.bento{display:grid;grid-template-columns:repeat(12,1fr);grid-auto-rows:minmax(10px,auto);gap:14px;}
+.cell{border:1px solid var(--hair);border-radius:var(--r-lg);background:var(--bg-cell);padding:18px 18px 17px;position:relative;display:flex;flex-direction:column;}
+.cell-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;}
+.cell-head h3{font-size:13px;font-weight:600;letter-spacing:-0.012em;color:var(--ink);}
+.demo-pill{font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-4);border:1px solid var(--hair);border-radius:3px;padding:2px 6px;font-weight:500;}
+.c-nav{grid-column:span 5;}
+.c-delta{grid-column:span 7;}
+.c-record{grid-column:span 7;}
+.c-chain{grid-column:span 5;}
+.c-attest{grid-column:span 5;}
+.c-contracts{grid-column:span 7;}
+.nav-figure{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;}
+.nav-price{font-family:var(--mono);font-size:42px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-0.03em;line-height:1;color:var(--ink);}
+.nav-price .sym,.nav-price .dec{opacity:0.5;}
+.nav-meta{margin-top:12px;display:flex;gap:18px;align-items:center;}
+.trend-pill{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--teal);background:var(--teal-soft);border:1px solid var(--teal-line);border-radius:4px;padding:3px 8px;letter-spacing:0.02em;}
+.nav-sub{font-family:var(--mono);font-size:12px;color:var(--ink-3);}
+.spark{height:46px;width:140px;flex:none;}
+.spark path.area{fill:url(#sparkfill);}
+.spark path.line{fill:none;stroke:var(--teal);stroke-width:1.6;}
+.delta-strip{display:flex;flex-wrap:wrap;gap:0;align-items:stretch;}
+.delta-item{flex:1;min-width:120px;padding:4px 16px;border-left:1px solid var(--hair-soft);}
+.delta-item:first-child{padding-left:0;border-left:none;}
+.delta-item .d-val{font-family:var(--mono);font-size:21px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink);letter-spacing:-0.02em;display:flex;align-items:center;gap:7px;}
+.delta-item.held .d-val{color:var(--teal);}
+.delta-item .d-val svg{width:15px;height:15px;}
+.delta-item .d-label{font-size:11px;text-transform:uppercase;letter-spacing:0.09em;color:var(--ink-4);font-weight:500;margin-top:6px;}
+.delta-foot{margin-top:16px;padding-top:13px;border-top:1px solid var(--hair-soft);font-size:12.5px;color:var(--ink-2);}
+.delta-foot b{color:var(--teal);font-weight:600;}
+.record-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--hair-soft);}
+.record-row:last-of-type{border-bottom:none;}
+.record-row .rk{font-size:12.5px;color:var(--ink-3);}
+.record-row .rv{font-family:var(--mono);font-size:13px;color:var(--ink);font-weight:500;}
+.record-row .rv.veto{color:var(--veto);}
+.verify-box{margin-top:14px;border:1px solid var(--hair);border-radius:var(--r-md);background:var(--bg-inset);padding:13px 14px;}
+.verify-top{display:flex;align-items:center;gap:10px;}
+.verify-check{width:24px;height:24px;flex:none;border-radius:50%;display:grid;place-items:center;border:1px solid var(--hair-strong);color:var(--ink-4);transition:border-color var(--t-fast),color var(--t-fast),background var(--t-fast);}
+.verify-check.ok{border-color:var(--teal-line);color:var(--teal);background:var(--teal-soft);}
+.verify-check svg{width:13px;height:13px;}
+.verify-text{font-size:12.5px;color:var(--ink-2);line-height:1.4;}
+.verify-text b{color:var(--ink);font-weight:600;}
+.verify-text .ok-word{color:var(--teal);}
+.verify-hash{margin-top:10px;font-family:var(--mono);font-size:12px;color:var(--ink-3);word-break:break-all;line-height:1.55;}
+.verify-hash .eq{color:var(--teal);}
+.record-actions{margin-top:14px;display:flex;gap:9px;}
+.btn-ghost{display:inline-flex;align-items:center;gap:7px;min-height:36px;padding:0 13px;background:transparent;border:1px solid var(--hair-strong);border-radius:var(--r-md);color:var(--ink-2);font-weight:500;font-size:12.5px;transition:border-color var(--t-fast),color var(--t-fast),background var(--t-fast);}
+.btn-ghost:hover{border-color:var(--teal-line);color:var(--teal);background:var(--teal-soft);}
+.btn-ghost svg{width:13px;height:13px;}
+.json-drawer{margin-top:12px;max-height:0;overflow:hidden;transition:max-height var(--t-panel),opacity var(--t-panel);opacity:0;}
+.json-drawer.open{max-height:340px;opacity:1;overflow:auto;}
+.json-pre{font-family:var(--mono);font-size:12px;line-height:1.6;color:var(--ink-2);background:#0a0c0d;border:1px solid var(--hair);border-radius:var(--r-md);padding:13px;white-space:pre;margin:0;}
+.json-pre .k{color:var(--teal-dim);}
+.json-pre .n{color:var(--teal);}
+.json-pre .veto{color:var(--veto);}
+.chain-row{display:grid;grid-template-columns:88px 1fr auto;gap:12px;align-items:center;padding:8px 0;}
+.chain-row .cn{font-size:12.5px;color:var(--ink-2);font-weight:500;}
+.chain-row.is-arc .cn{color:var(--teal);font-weight:600;}
+.bar-track{height:7px;border-radius:99px;background:var(--bg-inset);overflow:hidden;border:1px solid var(--hair-soft);}
+.bar-fill{height:100%;border-radius:99px;background:var(--hair-strong);transition:width var(--t-panel);}
+.chain-row.is-arc .bar-fill{background:var(--teal);}
+.chain-row .cv{font-family:var(--mono);font-size:12.5px;color:var(--ink);font-variant-numeric:tabular-nums;min-width:62px;text-align:right;}
+.chain-note{margin-top:12px;padding-top:12px;border-top:1px solid var(--hair-soft);font-size:12px;color:var(--ink-3);line-height:1.45;}
+.attest-empty{display:flex;flex-direction:column;align-items:flex-start;gap:12px;padding:6px 0 2px;}
+.attest-icon{width:34px;height:34px;border-radius:8px;display:grid;place-items:center;border:1px solid var(--hair-strong);color:var(--ink-3);}
+.attest-icon svg{width:17px;height:17px;}
+.attest-big{font-family:var(--mono);font-size:24px;font-weight:600;color:var(--ink-2);font-variant-numeric:tabular-nums;}
+.attest-copy{font-size:12.5px;color:var(--ink-3);line-height:1.5;}
+.attest-copy b{color:var(--ink-2);font-weight:600;}
+.attest-tag{font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--teal-dim);border:1px solid var(--teal-line);border-radius:3px;padding:2px 7px;font-weight:500;}
+.contract-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--hair-soft);}
+.contract-row:last-child{border-bottom:none;}
+.contract-name{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--ink-2);font-weight:500;}
+.contract-name .vchk{width:14px;height:14px;color:var(--teal);flex:none;}
+.copy-addr{display:inline-flex;align-items:center;gap:8px;min-height:32px;padding:0 9px;font-family:var(--mono);font-size:12px;color:var(--ink-2);background:var(--bg-inset);border:1px solid var(--hair);border-radius:var(--r-sm);transition:border-color var(--t-fast),color var(--t-fast);}
+.copy-addr:hover{border-color:var(--teal-line);color:var(--teal);}
+.copy-addr .ci{width:12px;height:12px;opacity:0.7;}
+.copy-addr.copied{border-color:var(--teal-line);color:var(--teal);}
+.skel{position:relative;overflow:hidden;background:var(--bg-inset);border-radius:var(--r-sm);}
+.skel::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(255,255,255,0.05),transparent);animation:shimmer 1.4s infinite;}
+@keyframes shimmer{100%{transform:translateX(100%);}}
+.sk-line{height:11px;margin:9px 0;}
+.sk-block{height:42px;margin:8px 0;}
+.fade-in{animation:fadein 200ms var(--ease);}
+@keyframes fadein{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+.err-band{display:none;align-items:center;gap:12px;justify-content:space-between;border:1px solid var(--veto-line);background:var(--veto-soft);border-radius:var(--r-md);padding:11px 14px;margin-bottom:14px;font-size:13px;color:var(--ink);}
+.err-band.show{display:flex;}
+.err-band .retry{min-height:34px;padding:0 12px;border-radius:var(--r-sm);border:1px solid var(--veto-line);background:transparent;color:var(--veto);font-weight:600;font-size:12.5px;}
+.scrim{position:fixed;inset:0;z-index:200;background:rgba(5,7,8,0.6);opacity:0;visibility:hidden;transition:opacity var(--t-panel),visibility var(--t-panel);backdrop-filter:blur(2px);}
+.scrim.show{opacity:1;visibility:visible;}
+.panel{position:fixed;top:0;right:0;bottom:0;z-index:210;width:min(420px,92vw);background:var(--bg-raise);border-left:1px solid var(--hair-strong);transform:translateX(100%);transition:transform var(--t-panel);display:flex;flex-direction:column;box-shadow:-30px 0 60px rgba(0,0,0,0.4);}
+.panel.show{transform:translateX(0);}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 20px;border-bottom:1px solid var(--hair);}
+.panel-head .ph-stage{display:flex;align-items:center;gap:10px;}
+.panel-head h3{font-size:15px;}
+.panel-close{width:34px;height:34px;border-radius:var(--r-sm);background:transparent;border:1px solid var(--hair);color:var(--ink-2);display:grid;place-items:center;transition:border-color var(--t-fast),color var(--t-fast);}
+.panel-close:hover{border-color:var(--hair-strong);color:var(--ink);}
+.panel-close svg{width:14px;height:14px;}
+.panel-body{padding:18px 20px;overflow-y:auto;flex:1;}
+.panel-tag{font-family:var(--mono);font-size:11px;letter-spacing:0.06em;color:var(--ink-3);}
+.panel-stat{display:flex;align-items:baseline;gap:10px;margin:6px 0 18px;}
+.panel-stat .ps-val{font-family:var(--mono);font-size:30px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-0.02em;}
+.panel-stat .ps-val.veto{color:var(--veto);}
+.panel-stat .ps-unit{font-family:var(--mono);font-size:13px;color:var(--ink-3);}
+.panel-section{margin-bottom:18px;}
+.panel-section > .label{margin-bottom:9px;display:block;}
+.panel-reason{font-size:13px;color:var(--ink-2);line-height:1.6;}
+.kv-list{display:flex;flex-direction:column;gap:0;}
+.kv{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--hair-soft);font-size:12.5px;}
+.kv:last-child{border-bottom:none;}
+.kv .kk{color:var(--ink-3);}
+.kv .kv-v{font-family:var(--mono);color:var(--ink);font-variant-numeric:tabular-nums;}
+.kv .kv-v.pos{color:var(--teal);}
+.kv .kv-v.veto{color:var(--veto);}
+.score-row{display:flex;align-items:center;gap:11px;padding:8px 0;border-bottom:1px solid var(--hair-soft);}
+.score-row:last-child{border-bottom:none;}
+.score-row .sr-rank{font-family:var(--mono);font-size:11px;color:var(--ink-4);width:18px;flex:none;}
+.score-row .sr-addr{font-family:var(--mono);font-size:12px;color:var(--ink-2);flex:1;}
+.score-row .sr-bar{width:70px;height:6px;border-radius:99px;background:var(--bg-inset);overflow:hidden;flex:none;border:1px solid var(--hair-soft);}
+.score-row .sr-bar i{display:block;height:100%;background:var(--teal);}
+.score-row .sr-bar.dim i{background:var(--hair-strong);}
+.score-row .sr-score{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--ink);width:48px;text-align:right;font-variant-numeric:tabular-nums;}
+.score-row.top .sr-addr{color:var(--ink);}
+.prop-card{border:1px solid var(--hair);border-radius:var(--r-md);padding:12px;margin-bottom:10px;}
+.prop-card.vetoed{border-color:var(--veto-line);background:rgba(255,93,93,0.04);}
+.prop-card .pc-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;}
+.prop-card .pc-name{font-family:var(--mono);font-size:12.5px;font-weight:600;color:var(--ink);}
+.prop-card .pc-verdict{font-family:var(--mono);font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--veto);background:var(--veto-soft);border:1px solid var(--veto-line);padding:2px 6px;border-radius:3px;font-weight:600;}
+.prop-card .pc-alloc{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;color:var(--ink-2);padding:3px 0;}
+.prop-card .pc-reason{margin-top:9px;padding-top:9px;border-top:1px solid var(--hair-soft);font-size:12px;color:var(--ink-3);line-height:1.5;}
+.seg{display:flex;background:var(--bg-inset);border:1px solid var(--hair);border-radius:var(--r-md);padding:3px;margin-bottom:18px;}
+.seg button{flex:1;min-height:38px;border:none;background:transparent;color:var(--ink-3);font-weight:600;font-size:13px;border-radius:var(--r-sm);transition:background var(--t-fast),color var(--t-fast);}
+.seg button.active{background:var(--teal-soft);color:var(--teal);}
+.field{margin-bottom:16px;}
+.field label{display:block;font-size:12px;text-transform:uppercase;letter-spacing:0.09em;color:var(--ink-3);font-weight:500;margin-bottom:8px;}
+.field .input-wrap{display:flex;align-items:center;gap:10px;border:1px solid var(--hair-strong);border-radius:var(--r-md);background:var(--bg-inset);padding:0 14px;transition:border-color var(--t-fast);}
+.field .input-wrap:focus-within{border-color:var(--teal-line);}
+.field .input-wrap.invalid{border-color:var(--veto-line);}
+.field input{flex:1;background:transparent;border:none;outline:none;color:var(--ink);font-family:var(--mono);font-size:16px;font-variant-numeric:tabular-nums;padding:13px 0;letter-spacing:-0.01em;}
+.field .unit{font-family:var(--mono);font-size:13px;color:var(--ink-3);}
+.field .field-err{font-size:12px;color:var(--veto);margin-top:7px;min-height:15px;display:none;}
+.field .field-err.show{display:block;}
+.bal-line{font-size:12.5px;color:var(--ink-3);margin-bottom:16px;display:flex;justify-content:space-between;}
+.bal-line .mono{color:var(--ink-2);}
+.est-box{border:1px solid var(--hair);border-radius:var(--r-md);background:var(--bg-cell);padding:13px 14px;margin-bottom:18px;}
+.est-box .er{display:flex;justify-content:space-between;align-items:baseline;padding:4px 0;font-size:12.5px;}
+.est-box .er .ek{color:var(--ink-3);}
+.est-box .er .ev{font-family:var(--mono);color:var(--ink);font-variant-numeric:tabular-nums;font-size:15px;font-weight:600;}
+.est-box .er .ev .dim{opacity:0.5;}
+.btn-primary{width:100%;min-height:48px;border:1px solid var(--teal-line);border-radius:var(--r-md);background:var(--teal);color:#04201a;font-weight:700;font-size:14px;letter-spacing:-0.01em;transition:filter var(--t-fast),transform var(--t-fast);}
+.btn-primary:hover{filter:brightness(1.08);}
+.btn-primary:active{transform:translateY(1px);}
+.btn-primary:disabled{opacity:0.5;cursor:not-allowed;}
+.settle{display:none;text-align:center;padding:20px 0;}
+.settle.show{display:block;}
+.settle .spinner{width:34px;height:34px;border-radius:50%;border:2px solid var(--hair-strong);border-top-color:var(--teal);margin:0 auto 14px;animation:spin 0.7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.settle .s-label{font-size:13px;color:var(--ink-2);}
+.settle .s-timer{font-family:var(--mono);font-size:30px;font-weight:600;color:var(--teal);font-variant-numeric:tabular-nums;margin-top:8px;}
+.success{display:none;text-align:center;padding:18px 0;}
+.success.show{display:block;animation:fadein 250ms var(--ease);}
+.success .s-check{width:52px;height:52px;border-radius:50%;border:1.5px solid var(--teal-line);background:var(--teal-soft);display:grid;place-items:center;margin:0 auto 16px;color:var(--teal);}
+.success .s-check svg{width:24px;height:24px;}
+.success .s-head{font-size:16px;font-weight:600;margin-bottom:8px;}
+.success .s-detail{font-size:13px;color:var(--ink-2);line-height:1.6;}
+.success .s-detail .mono{color:var(--teal);}
+.footer{margin-top:48px;border-top:1px solid var(--hair);padding:28px 0 40px;}
+.footer-inner{display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:space-between;}
+.footer .cite{font-size:12px;color:var(--ink-4);line-height:1.6;max-width:560px;}
+.footer .cite b{color:var(--ink-3);font-weight:500;}
+.footer-tools{display:flex;gap:9px;}
+.footer-tools button{font-family:var(--mono);font-size:11px;letter-spacing:0.05em;color:var(--ink-3);background:transparent;border:1px dashed var(--hair-strong);border-radius:var(--r-sm);padding:6px 10px;transition:color var(--t-fast),border-color var(--t-fast);}
+.footer-tools button:hover{color:var(--teal);border-color:var(--teal-line);}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);z-index:300;background:var(--bg-inset);border:1px solid var(--teal-line);border-radius:var(--r-md);padding:9px 16px;font-size:12.5px;color:var(--teal);font-family:var(--mono);opacity:0;pointer-events:none;transition:opacity var(--t-fast),transform var(--t-fast);}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+@media (max-width:880px){
+  .bento > .c-nav,.bento > .c-delta,.bento > .c-record,
+  .bento > .c-chain,.bento > .c-attest,.bento > .c-contracts{grid-column:span 12;}
+  .nav-links{display:none;}
+}
+@media (max-width:720px){
+  .nav-kpi{display:none;}
+  .hero h1{font-size:28px;}
+  .pipeline{grid-template-columns:1fr;gap:0;}
+  .node{margin:0 0 34px;}
+  .node:last-child{margin-bottom:0;}
+  .connector{display:none;}
+  .node:not(:last-child)::after{content:"";position:absolute;left:50%;bottom:-26px;width:2px;height:18px;background:var(--teal-line);transform:translateX(-50%);}
+  .node.is-veto:not(:last-child)::after{background:var(--veto-line);}
+  .delta-item{flex:0 0 50%;min-width:0;border-left:none;padding:8px 0;}
+  .pipeline-cell{padding:20px 16px;}
+  .wrap{padding:0 16px;}
+}
+@media (prefers-reduced-motion:reduce){
+  .connector .flow{animation:none;opacity:0.55;}
+  .hero-kicker .pulse::after{animation:none;}
+  .skel::after{animation:none;}
+  *{scroll-behavior:auto;}
+}
+</style>
+</head>
+<body>
+<div class="dna-badge" aria-hidden="true">DNA-B-T-I-M-S</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="sparkfill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(0,212,170,0.22)"/>
+      <stop offset="100%" stop-color="rgba(0,212,170,0)"/>
+    </linearGradient>
+  </defs>
+</svg>
+
+<div class="app">
+
+<nav class="nav">
+  <div class="brand">
+    <span class="mark" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+        <path d="M2 13c3 0 3-4 6-4s3 4 6 4 3-4 6-4" stroke="#00d4aa" stroke-width="1.6" stroke-linecap="round"/>
+        <circle cx="11" cy="6" r="1.4" fill="#00d4aa"/>
+      </svg>
+    </span>
+    WhaleIndex
+  </div>
+  <div class="nav-kpi" aria-label="Net asset value per WHALE share">
+    <span class="k-label">NAV</span>
+    <span class="k-val"><span class="sym">$</span>1<span class="dec">.0432</span></span>
+    <span class="k-trend">+1.3%</span>
+  </div>
+  <div class="nav-spacer"></div>
+  <div class="nav-links">
+    <a href="#pipeline">Pipeline</a>
+    <a href="#dashboard">Dashboard</a>
+    <a href="#record">Decision Record</a>
+  </div>
+  <button class="connect-btn" id="connectBtn" aria-haspopup="dialog">
+    <span class="dot" aria-hidden="true"></span> Connect
+  </button>
+</nav>
+
+<header class="hero" id="pipeline">
+  <div class="wrap">
+    <div class="hero-head">
+      <span class="hero-kicker"><span class="pulse" aria-hidden="true"></span> CYCLE 2026-05-25 21:51 UTC &middot; LIVE</span>
+      <h1>Watch the agents <span class="muted">decide.</span></h1>
+      <p class="hero-sub">WhaleIndex mirrors top Hyperliquid whales through a four-agent chain. Every cycle runs end to end and anchors its reasoning on-chain &mdash; including the cycles where the right move is to do nothing. This is one of those.</p>
+      <div class="hero-verdict-line">
+        <span class="verdict-chip">11 whales scored</span>
+        <span class="verdict-chip">3 proposals drafted</span>
+        <span class="verdict-chip" style="border-color:var(--veto-line);color:var(--veto);background:var(--veto-soft)">3 vetoed by Risk</span>
+        <span class="verdict-chip held">
+          <svg viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3.2 3L13 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Coordinator: HELD
+        </span>
+      </div>
+    </div>
+
+    <div class="pipeline-cell">
+      <div class="pipeline-top">
+        <div class="ptitle"><span class="label">Decision pipeline</span></div>
+        <div class="cycle-meta">
+          <span>method <b>composite 0&ndash;100</b></span>
+          <span>aum <b>$5,000</b></span>
+          <span>pnl window <b>30d</b></span>
+        </div>
+      </div>
+
+      <div class="pipeline" role="list" aria-label="Four-agent decision pipeline">
+        <button class="node" role="listitem" data-node="scorer" aria-label="Scorer agent. 11 whales scored. Top score 59.63. Open detail.">
+          <div class="node-head">
+            <div class="node-stage"><span class="node-num">1</span><span class="node-name">Scorer</span></div>
+            <span class="node-status">scored</span>
+          </div>
+          <div class="node-summary">Ranked 11 whale wallets on PnL, Sharpe, drawdown &amp; recency. Two are active; the rest are flat or withdrawn.</div>
+          <div class="node-metric"><span class="m-label">Top score</span><span class="m-val">59.63</span></div>
+          <span class="node-cta">view scores <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M3 9l6-6M4 3h5v5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        </button>
+
+        <button class="node" role="listitem" data-node="allocator" aria-label="Allocator agent. 3 proposals drafted across 2 coins. Open detail.">
+          <div class="node-head">
+            <div class="node-stage"><span class="node-num">2</span><span class="node-name">Allocator</span></div>
+            <span class="node-status">drafted</span>
+          </div>
+          <div class="node-summary">Built three weighting strategies &mdash; equal-weight, score-weighted, kelly-bounded &mdash; over the top 2 coins, HYPE &amp; ETH.</div>
+          <div class="node-metric"><span class="m-label">Proposals</span><span class="m-val">3</span></div>
+          <span class="node-cta">view proposals <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M3 9l6-6M4 3h5v5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        </button>
+
+        <button class="node is-veto" role="listitem" data-node="risk" aria-label="Risk agent. Vetoed all 3 proposals. Open detail.">
+          <div class="node-head">
+            <div class="node-stage"><span class="node-num">3</span><span class="node-name">Risk</span></div>
+            <span class="node-status">veto</span>
+          </div>
+          <div class="node-summary">Rejected every proposal &mdash; directional bias hit 100% (cap 80%) and concentration reached 98.2% (cap 50%).</div>
+          <div class="node-metric"><span class="m-label">Vetoed</span><span class="m-val">3 / 3</span></div>
+          <span class="node-cta">view veto reasons <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M3 9l6-6M4 3h5v5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        </button>
+
+        <button class="node" role="listitem" data-node="coordinator" aria-label="Coordinator agent. Verdict HELD, no rebalance this cycle. Open detail.">
+          <div class="node-head">
+            <div class="node-stage"><span class="node-num">4</span><span class="node-name">Coordinator</span></div>
+            <span class="node-status">held</span>
+          </div>
+          <div class="node-summary">With no proposal surviving Risk, the Coordinator held the book. No rebalance this cycle, anchored on-chain.</div>
+          <div class="node-metric"><span class="m-label">Verdict</span><span class="m-val">HELD</span></div>
+          <span class="node-cta">view verdict <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M3 9l6-6M4 3h5v5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        </button>
+      </div>
+
+      <div id="connectorLayer" aria-hidden="true"></div>
+
+      <div class="pipeline-foot">
+        <span class="anchored">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3.2 3L13 5" stroke="var(--teal)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Reasoning anchored on Arc &middot; <span class="cid">cid 0x328536b0&hellip;a87fcf</span>
+        </span>
+        <span>AllocationDecided &middot; block-anchored &middot; doc v2</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="dash" id="dashboard">
+  <div class="wrap">
+    <div class="section-eyebrow"><span class="label">The book, the proof</span><span class="rule"></span></div>
+
+    <div class="err-band" id="errBand" role="alert">
+      <span>One read failed &mdash; the NAV oracle didn't respond. Everything else still loaded.</span>
+      <button class="retry" id="errRetry">Retry</button>
+    </div>
+
+    <div class="bento">
+
+      <section class="cell c-nav" id="navCell" aria-label="NAV per share">
+        <div class="cell-head"><h3>NAV per WHALE</h3><span class="demo-pill">demo data</span></div>
+        <div data-skeleton>
+          <div class="skel sk-block" style="width:55%"></div>
+          <div class="skel sk-line" style="width:40%"></div>
+        </div>
+        <div data-content hidden>
+          <div class="nav-figure">
+            <div>
+              <div class="nav-price"><span class="sym">$</span>1<span class="dec">.0432</span></div>
+              <div class="nav-meta">
+                <span class="trend-pill">+1.3% &middot; 30d</span>
+                <span class="nav-sub">oracle fresh &middot; 12s ago</span>
+              </div>
+            </div>
+            <svg class="spark" viewBox="0 0 140 46" preserveAspectRatio="none" aria-hidden="true">
+              <path class="area" d="M0,38 L12,36 L24,37 L36,32 L48,33 L60,28 L72,30 L84,24 L96,25 L108,19 L120,21 L132,14 L140,12 L140,46 L0,46 Z"/>
+              <path class="line" d="M0,38 L12,36 L24,37 L36,32 L48,33 L60,28 L72,30 L84,24 L96,25 L108,19 L120,21 L132,14 L140,12"/>
+            </svg>
+          </div>
+        </div>
+      </section>
+
+      <section class="cell c-delta" id="deltaCell" aria-label="Since last rebalance">
+        <div class="cell-head"><h3>Since last rebalance</h3><span class="demo-pill">live decision</span></div>
+        <div data-skeleton>
+          <div class="skel sk-block" style="width:90%"></div>
+          <div class="skel sk-line" style="width:60%"></div>
+        </div>
+        <div data-content hidden>
+          <div class="delta-strip">
+            <div class="delta-item"><div class="d-val">0</div><div class="d-label">positions changed</div></div>
+            <div class="delta-item held"><div class="d-val">
+              <svg viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3.2 3L13 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>HELD</div><div class="d-label">agent verdict</div></div>
+            <div class="delta-item"><div class="d-val">3</div><div class="d-label">proposals vetoed</div></div>
+            <div class="delta-item"><div class="d-val">~4h</div><div class="d-label">cycle cadence</div></div>
+          </div>
+          <div class="delta-foot">0 changes &middot; agent held &middot; <b>reasoning anchored &#10003;</b> &mdash; a quiet cycle is a disciplined one, not a missing one.</div>
+        </div>
+      </section>
+
+      <section class="cell c-record" id="recordCell" aria-label="Decision record and verification">
+        <div class="cell-head"><h3>Decision record</h3><span class="demo-pill" id="recordSource">verifying&hellip;</span></div>
+        <div data-skeleton>
+          <div class="skel sk-line" style="width:80%"></div>
+          <div class="skel sk-line" style="width:65%"></div>
+          <div class="skel sk-block" style="width:100%"></div>
+        </div>
+        <div data-content hidden>
+          <div class="record-row"><span class="rk">Chosen proposal</span><span class="rv veto">none &mdash; all vetoed</span></div>
+          <div class="record-row"><span class="rk">Coordinator</span><span class="rv">no rebalance this cycle</span></div>
+          <div class="record-row"><span class="rk">Snapshot</span><span class="rv">2026-05-25T21:51:23Z</span></div>
+          <div class="record-row"><span class="rk">Doc version</span><span class="rv">v2 &middot; 11 whales</span></div>
+
+          <div class="verify-box" id="verifyBox">
+            <div class="verify-top">
+              <span class="verify-check" id="verifyCheck" aria-hidden="true">
+                <svg viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3.2 3L13 5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+              <div class="verify-text" id="verifyText"><b>Computing digest&hellip;</b> hashing the decision in your browser.</div>
+            </div>
+            <div class="verify-hash" id="verifyHash"></div>
+          </div>
+
+          <div class="record-actions">
+            <button class="btn-ghost" id="toggleJson" aria-expanded="false" aria-controls="jsonDrawer">
+              <svg viewBox="0 0 16 16" fill="none"><path d="M5 2H3v12h2M11 2h2v12h-2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+              Raw JSON
+            </button>
+            <button class="btn-ghost" id="reverify">
+              <svg viewBox="0 0 16 16" fill="none"><path d="M13 8a5 5 0 11-1.5-3.5M13 2v3h-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Re-verify
+            </button>
+          </div>
+          <div class="json-drawer" id="jsonDrawer"><pre class="json-pre" id="jsonPre"></pre></div>
+        </div>
+      </section>
+
+      <section class="cell c-chain" id="chainCell" aria-label="Chain cost and latency comparison">
+        <div class="cell-head"><h3>Why anchor on Arc</h3><span class="demo-pill">demo data</span></div>
+        <div data-skeleton>
+          <div class="skel sk-line" style="width:90%"></div>
+          <div class="skel sk-line" style="width:90%"></div>
+          <div class="skel sk-line" style="width:90%"></div>
+        </div>
+        <div data-content hidden>
+          <div class="chain-row is-arc"><span class="cn">Arc</span><span class="bar-track"><span class="bar-fill" style="width:14%"></span></span><span class="cv">1.13s</span></div>
+          <div class="chain-row"><span class="cn">Arbitrum</span><span class="bar-track"><span class="bar-fill" style="width:48%"></span></span><span class="cv">~3.8s</span></div>
+          <div class="chain-row"><span class="cn">Ethereum</span><span class="bar-track"><span class="bar-fill" style="width:100%"></span></span><span class="cv">~12s</span></div>
+          <div class="chain-note">Settlement cost on Arc &asymp; <span class="mono" style="color:var(--teal)">$0.0005</span> per rebalance, paid in USDC as native gas &mdash; no separate gas token to manage.</div>
+        </div>
+      </section>
+
+      <section class="cell c-attest" id="attestCell" aria-label="Bonded whale attestation">
+        <div class="cell-head"><h3>Bonded whales</h3><span class="attest-tag">intentional</span></div>
+        <div data-skeleton>
+          <div class="skel sk-block" style="width:40%"></div>
+          <div class="skel sk-line" style="width:80%"></div>
+        </div>
+        <div data-content hidden>
+          <div class="attest-empty">
+            <span class="attest-icon" aria-hidden="true">
+              <svg viewBox="0 0 18 18" fill="none"><path d="M9 1l7 3v5c0 4-3 6.5-7 8-4-1.5-7-4-7-8V4l7-3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+            </span>
+            <div class="attest-big">0 bonded</div>
+            <div class="attest-copy">No whale has staked a bond yet. The <b>WhaleAttestation</b> contract is live and ready to slash &mdash; there's simply nothing to attest this cycle. This is the honest empty state, not a failed read.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="cell c-contracts" id="contractsCell" aria-label="Verified contracts">
+        <div class="cell-head"><h3>Verified contracts &middot; Arc testnet</h3><span class="demo-pill">chain 5042002</span></div>
+        <div data-skeleton>
+          <div class="skel sk-line" style="width:100%"></div>
+          <div class="skel sk-line" style="width:100%"></div>
+          <div class="skel sk-line" style="width:100%"></div>
+        </div>
+        <div data-content hidden>
+          <div class="contract-row">
+            <span class="contract-name"><svg class="vchk" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3.2 3L13 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>IndexToken</span>
+            <button class="copy-addr" data-copy="0xAdEa3FaE6011c2D275868d1c1933B37BE7648269" aria-label="Copy IndexToken address">
+              0xAdEa&hellip;8269 <svg class="ci" viewBox="0 0 14 14" fill="none"><rect x="4" y="4" width="8" height="8" rx="1.4" stroke="currentColor" stroke-width="1.3"/><path d="M2 9V3a1 1 0 011-1h6" stroke="currentColor" stroke-width="1.3"/></svg>
+            </button>
+          </div>
+          <div class="contract-row">
+            <span class="contract-name"><svg class="vchk" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3.2 3L13 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>RebalanceExecutor</span>
+            <button class="copy-addr" data-copy="0xb06a30226979789508306dAA9b027914045a4024" aria-label="Copy RebalanceExecutor address">
+              0xb06a&hellip;4024 <svg class="ci" viewBox="0 0 14 14" fill="none"><rect x="4" y="4" width="8" height="8" rx="1.4" stroke="currentColor" stroke-width="1.3"/><path d="M2 9V3a1 1 0 011-1h6" stroke="currentColor" stroke-width="1.3"/></svg>
+            </button>
+          </div>
+          <div class="contract-row">
+            <span class="contract-name"><svg class="vchk" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3.2 3L13 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>NAVOracle</span>
+            <button class="copy-addr" data-copy="0xfEbB84BE47b0d440Ba08DaE0f5E3b09B4f989Cf8" aria-label="Copy NAVOracle address">
+              0xfEbB&hellip;9Cf8 <svg class="ci" viewBox="0 0 14 14" fill="none"><rect x="4" y="4" width="8" height="8" rx="1.4" stroke="currentColor" stroke-width="1.3"/><path d="M2 9V3a1 1 0 011-1h6" stroke="currentColor" stroke-width="1.3"/></svg>
+            </button>
+          </div>
+          <div class="contract-row">
+            <span class="contract-name"><svg class="vchk" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3.2 3L13 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>WhaleAttestation</span>
+            <button class="copy-addr" data-copy="0x1d2d34D941b13CbF233051074F007ecf68fB0F7f" aria-label="Copy WhaleAttestation address">
+              0x1d2d&hellip;0F7f <svg class="ci" viewBox="0 0 14 14" fill="none"><rect x="4" y="4" width="8" height="8" rx="1.4" stroke="currentColor" stroke-width="1.3"/><path d="M2 9V3a1 1 0 011-1h6" stroke="currentColor" stroke-width="1.3"/></svg>
+            </button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-inner">
+    <div class="cite">
+      <b>WhaleIndex</b> &mdash; a proof-of-reasoning ledger with a buy button. USDC-denominated, Arc testnet.<br>
+      Design language drawn from <b>Linear</b> (motion craft), <b>Dune</b> (widget density &amp; per-widget loading), and a restrained mission-console aesthetic. Proposal 3 &middot; DNA-B-T-I-M-S.
+    </div>
+    <div class="footer-tools">
+      <button id="demoError">toggle error band</button>
+      <button id="demoReload">replay loading</button>
+    </div>
+  </div>
+</footer>
+
+</div>
+
+<div class="scrim" id="scrim"></div>
+
+<aside class="panel" id="nodePanel" role="dialog" aria-modal="true" aria-labelledby="npTitle" tabindex="-1">
+  <div class="panel-head">
+    <div class="ph-stage"><span class="node-num" id="npNum">1</span><h3 id="npTitle">Scorer</h3></div>
+    <button class="panel-close" data-close aria-label="Close panel">
+      <svg viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+  <div class="panel-body" id="npBody"></div>
+</aside>
+
+<aside class="panel" id="buyPanel" role="dialog" aria-modal="true" aria-labelledby="buyTitle" tabindex="-1">
+  <div class="panel-head">
+    <div class="ph-stage"><h3 id="buyTitle">Buy WHALE</h3></div>
+    <button class="panel-close" data-close aria-label="Close panel">
+      <svg viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+  <div class="panel-body">
+    <div id="buyForm">
+      <div class="seg" role="tablist" aria-label="Buy or redeem">
+        <button class="active" id="segBuy" role="tab" aria-selected="true">Buy</button>
+        <button id="segRedeem" role="tab" aria-selected="false">Redeem</button>
+      </div>
+      <p class="panel-tag" style="margin:0 0 16px;color:var(--ink-3)">Connect simulated &middot; Arc testnet (chain 5042002). No real funds move in this demo.</p>
+      <div class="bal-line"><span>Wallet balance</span><span class="mono" id="balLine">2,500.00 USDC</span></div>
+      <div class="field">
+        <label for="buyAmt" id="amtLabel">Amount to spend (USDC)</label>
+        <div class="input-wrap" id="amtWrap">
+          <input id="buyAmt" type="text" inputmode="decimal" placeholder="0.00" autocomplete="off" aria-describedby="amtErr">
+          <span class="unit" id="amtUnit">USDC</span>
+        </div>
+        <div class="field-err" id="amtErr">Enter an amount you can cover with your balance.</div>
+      </div>
+      <div class="est-box">
+        <div class="er"><span class="ek" id="estLabel">Estimated shares</span><span class="ev" id="estVal">0<span class="dim">.0000</span> WHALE</span></div>
+        <div class="er"><span class="ek">Share price</span><span class="ev">$1<span class="dim">.0432</span></span></div>
+      </div>
+      <button class="btn-primary" id="buySubmit" disabled>Enter an amount</button>
+    </div>
+
+    <div class="settle" id="settleView">
+      <div class="spinner" aria-hidden="true"></div>
+      <div class="s-label">Settling on Arc&hellip;</div>
+      <div class="s-timer"><span id="settleMs">0</span> ms</div>
+      <p class="panel-tag" style="margin-top:14px;color:var(--ink-4)">Arc finalises in well under a second.</p>
+    </div>
+
+    <div class="success" id="successView" role="status">
+      <div class="s-check" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.5 4.5L19 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="s-head" id="successHead">Settled.</div>
+      <div class="s-detail" id="successDetail"></div>
+      <button class="btn-ghost" id="successDone" style="margin-top:18px">Done</button>
+    </div>
+  </div>
+</aside>
+
+<div class="toast" id="toast" role="status" aria-live="polite">Copied</div>
+
+<script>
+"use strict";
+
+var DECISION = {
+  cid: "328536b0fb144e6e52a33e65cabe9fe090fc15f668ada69167f58f89e6a87fcf",
+  snapshot_iso: "2026-05-25T21:51:23Z",
+  traded: false,
+  aum_usdc: 5000.0,
+  version: 2,
+  chosen_proposal: null,
+  coordinator_reasoning: "All proposals vetoed by RiskAgent — no rebalance this cycle.",
+  scorer: [
+    {wallet:"0x4e14fc11f58b64740e66e4b1aa188a4b007c0eab", score:59.63, pnl:7402.7, pos:1, active:true},
+    {wallet:"0xe44bd27c9f10fa2f89fdb3ab4b4f0e460da29ea8", score:52.00, pnl:0, pos:0, active:false},
+    {wallet:"0x90b38c5728f184c87ef46479cf7b402d7b98b98a", score:48.00, pnl:0, pos:0, active:false},
+    {wallet:"0x85530f0ff6496c72a619f37a60f3c1a59077737f", score:44.00, pnl:0, pos:0, active:false},
+    {wallet:"0x62bc1fe6009388219dd84f9dca37930f6fb6fa22", score:40.00, pnl:0, pos:0, active:false},
+    {wallet:"0x4eb8d907136189a34c9b087950211b6a566f7819", score:36.00, pnl:0, pos:0, active:false},
+    {wallet:"0x082e843a431aef031264dc232693dd710aedca88", score:32.00, pnl:0, pos:1, active:true},
+    {wallet:"0x493db0ed7514c975e9abcc110bd40c473b6763e3", score:32.00, pnl:0, pos:0, active:false},
+    {wallet:"0x488d2a9b70cc18ef66057a48ab3d59da1c59fe08", score:28.00, pnl:0, pos:0, active:false},
+    {wallet:"0x393d0b87ed38fc779fd9611144ae649ba6082109", score:24.00, pnl:0, pos:0, active:false},
+    {wallet:"0x05cafe987297448f21a3c7ae0ae815fddecac655", score:16.00, pnl:0, pos:0, active:false}
+  ],
+  allocator: [
+    {name:"equal_weight", method:"equal-weight",
+     allocs:[{coin:"HYPE",dir:"long",usd:2500.0},{coin:"ETH",dir:"long",usd:2500.0}],
+     reasoning:"top-2 coins by |aggregate notional|, equal-weighted"},
+    {name:"score_weighted", method:"score-weighted",
+     allocs:[{coin:"HYPE",dir:"long",usd:4908.88},{coin:"ETH",dir:"long",usd:91.12}],
+     reasoning:"per-coin score-weighted notional, normalised to AUM"},
+    {name:"kelly_bounded", method:"kelly-bounded",
+     allocs:[{coin:"HYPE",dir:"long",usd:2000.0},{coin:"ETH",dir:"long",usd:3000.0}],
+     reasoning:"score-weighted, capped at 40%/coin, excess redistributed"}
+  ],
+  risk: [
+    {name:"equal_weight", verdict:"veto", reasons:["directional bias: |L-S|/AUM = 100% (cap 80%)"]},
+    {name:"score_weighted", verdict:"veto", reasons:["concentration: max coin = 98.2% (cap 50%)","directional bias: |L-S|/AUM = 100% (cap 80%)"]},
+    {name:"kelly_bounded", verdict:"veto", reasons:["concentration: max coin = 60.0% (cap 50%)","directional bias: |L-S|/AUM = 100% (cap 80%)"]}
+  ]
+};
+
+var SHARE_PRICE = 1.0432;
+var $ = function(s,r){return (r||document).querySelector(s);};
+var $$ = function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s));};
+var short = function(a){return a.slice(0,6)+"…"+a.slice(-4);};
+var esc = function(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");};
+
+function drawConnectors(){
+  var layer = $("#connectorLayer"); var cell = $(".pipeline-cell");
+  if(!layer || !cell) return;
+  layer.innerHTML = "";
+  if(window.innerWidth <= 720) return;
+  var nodes = $$(".pipeline .node");
+  var cellRect = cell.getBoundingClientRect();
+  for(var i=0;i<nodes.length-1;i++){
+    var a = nodes[i].getBoundingClientRect();
+    var b = nodes[i+1].getBoundingClientRect();
+    var left = a.right - cellRect.left;
+    var width = b.left - a.right;
+    var top = (a.top + a.height/2) - cellRect.top;
+    var veto = i===2;
+    var c = document.createElement("span");
+    c.className = "connector" + (veto?" c-veto":"");
+    c.style.left = left+"px"; c.style.width = width+"px"; c.style.top = top+"px";
+    c.style.setProperty("--flow-end", width+"px");
+    c.innerHTML = '<span class="base"></span><span class="flow"></span>'+
+      '<svg class="arrow" width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M1 1l3.5 3.5L1 8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    c.querySelector(".flow").style.animationDelay = (i*0.85)+"s";
+    layer.appendChild(c);
+  }
+}
+window.addEventListener("resize", drawConnectors);
+
+function revealCell(cell, delay){
+  var sk = $("[data-skeleton]", cell); var ct = $("[data-content]", cell);
+  if(!sk || !ct) return;
+  setTimeout(function(){
+    sk.style.display = "none"; ct.hidden = false; ct.classList.add("fade-in");
+    if(cell.id === "recordCell") runVerify();
+  }, delay);
+}
+function bootDashboard(){
+  revealCell($("#navCell"), 280);
+  revealCell($("#deltaCell"), 520);
+  revealCell($("#chainCell"), 760);
+  revealCell($("#attestCell"), 980);
+  revealCell($("#contractsCell"), 1180);
+  revealCell($("#recordCell"), 1450);
+}
+
+function sha256Hex(str){
+  return crypto.subtle.digest("SHA-256", new TextEncoder().encode(str)).then(function(buf){
+    return Array.prototype.map.call(new Uint8Array(buf), function(b){return b.toString(16).padStart(2,"0");}).join("");
+  });
+}
+function runVerify(){
+  var check = $("#verifyCheck"), text = $("#verifyText"), hashEl = $("#verifyHash"), src = $("#recordSource");
+  check.classList.remove("ok");
+  text.innerHTML = "<b>Computing digest…</b> hashing the decision in your browser.";
+  hashEl.textContent = "";
+  var payload = JSON.stringify(DECISION);
+  sha256Hex(payload).then(function(digest){
+    setTimeout(function(){
+      check.classList.add("ok");
+      src.textContent = "verified";
+      text.innerHTML = 'Your browser just verified this. <span class="ok-word">Digest matches the embedded record.</span>';
+      hashEl.innerHTML = 'sha256(decision) = <span class="eq">'+ short("0x"+digest) +
+        '</span><br>anchored cid = <span class="eq">0x328536b0…a87fcf</span> · Arc';
+    }, 620);
+  });
+}
+function buildJson(){
+  var pretty = esc(JSON.stringify(DECISION, null, 2))
+    .replace(/&quot;([^&]+?)&quot;:/g,'"<span class="k">$1</span>":')
+    .replace(/"([\w\-— .%|=,():\/+]+)"/g, function(m){ return m; })
+    .replace(/&quot;veto&quot;/g,'"<span class="veto">veto</span>"');
+  // simple number highlight
+  pretty = pretty.replace(/: (-?\d+\.?\d*)/g,': <span class="n">$1</span>');
+  $("#jsonPre").innerHTML = pretty;
+}
+
+var toastT;
+function toast(msg){
+  var t = $("#toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastT); toastT = setTimeout(function(){t.classList.remove("show");}, 1400);
+}
+$$(".copy-addr").forEach(function(btn){
+  btn.addEventListener("click", function(){
+    var addr = btn.getAttribute("data-copy");
+    if(navigator.clipboard){ navigator.clipboard.writeText(addr).catch(function(){}); }
+    btn.classList.add("copied");
+    toast("Copied " + short(addr));
+    setTimeout(function(){btn.classList.remove("copied");}, 1200);
+  });
+});
+
+$("#toggleJson").addEventListener("click", function(e){
+  var d = $("#jsonDrawer"); var open = d.classList.toggle("open");
+  e.currentTarget.setAttribute("aria-expanded", open);
+  if(open && !$("#jsonPre").innerHTML) buildJson();
+});
+$("#reverify").addEventListener("click", runVerify);
+
+function navrow(addr, score, max, active, rank){
+  var pct = Math.round((score/max)*100);
+  return '<div class="score-row '+(rank===0?'top':'')+'">'+
+    '<span class="sr-rank">'+(rank+1)+'</span>'+
+    '<span class="sr-addr">'+short(addr)+'</span>'+
+    '<span class="sr-bar '+(active?'':'dim')+'"><i style="width:'+pct+'%"></i></span>'+
+    '<span class="sr-score">'+score.toFixed(1)+'</span></div>';
+}
+var NODE_CONTENT = {
+  scorer:function(){
+    var rows = DECISION.scorer.map(function(s,i){return navrow(s.wallet, s.score, 100, s.active, i);}).join("");
+    return {num:1, title:"Scorer", body:
+      '<span class="panel-tag">ScorerAgent · composite 0–100</span>'+
+      '<div class="panel-stat"><span class="ps-val">59.63</span><span class="ps-unit">top score / 11 whales</span></div>'+
+      '<div class="panel-section"><span class="label">How it scores</span>'+
+        '<p class="panel-reason">Each whale is scored on realised PnL, Sharpe, max drawdown, win rate, open positions and whether it is active right now. Only two wallets are live this cycle &mdash; '+
+        '<span class="mono" style="color:var(--ink)">'+short("0x4e14fc11f58b64740e66e4b1aa188a4b007c0eab")+'</span> (ETH long, +$7,403 realised) and '+
+        '<span class="mono" style="color:var(--ink)">'+short("0x082e843a431aef031264dc232693dd710aedca88")+'</span> (HYPE long). The rest are flat or withdrawn and score near the recency floor.</p></div>'+
+      '<div class="panel-section"><span class="label">Ranked wallets</span>'+rows+'</div>'+
+      '<div class="panel-section"><span class="label">Top whale components</span>'+
+        '<div class="kv-list">'+
+        '<div class="kv"><span class="kk">PnL (30d realised)</span><span class="kv-v pos">+$7,402.70</span></div>'+
+        '<div class="kv"><span class="kk">Win rate</span><span class="kv-v">26.3%</span></div>'+
+        '<div class="kv"><span class="kk">Max drawdown</span><span class="kv-v">0.0%</span></div>'+
+        '<div class="kv"><span class="kk">Open positions</span><span class="kv-v">1</span></div>'+
+        '</div></div>'};
+  },
+  allocator:function(){
+    var cards = DECISION.allocator.map(function(p){
+      var allocs = p.allocs.map(function(a){return '<div class="pc-alloc"><span>'+a.coin+' · '+a.dir+'</span><span>$'+a.usd.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+'</span></div>';}).join("");
+      return '<div class="prop-card"><div class="pc-head"><span class="pc-name">'+p.name+'</span><span class="panel-tag">'+p.method+'</span></div>'+allocs+'<div class="pc-reason">'+p.reasoning+'</div></div>';
+    }).join("");
+    return {num:2, title:"Allocator", body:
+      '<span class="panel-tag">AllocatorAgent · 3 strategies</span>'+
+      '<div class="panel-stat"><span class="ps-val">3</span><span class="ps-unit">proposals · $5,000 AUM · 2 coins</span></div>'+
+      '<div class="panel-section"><span class="label">Drafted proposals</span>'+cards+'</div>'+
+      '<p class="panel-reason" style="color:var(--ink-3)">All three concentrate on HYPE &amp; ETH because they are the only coins with meaningful aggregate whale notional this snapshot &mdash; which is exactly what trips the Risk gate next.</p>'};
+  },
+  risk:function(){
+    var cards = DECISION.risk.map(function(v){
+      var reasons = v.reasons.map(function(r){return '<div class="pc-alloc"><span style="color:var(--veto)">⊘</span><span style="color:var(--ink-2);text-align:right">'+r+'</span></div>';}).join("");
+      return '<div class="prop-card vetoed"><div class="pc-head"><span class="pc-name">'+v.name+'</span><span class="pc-verdict">veto</span></div>'+reasons+'</div>';
+    }).join("");
+    return {num:3, title:"Risk", veto:true, body:
+      '<span class="panel-tag" style="color:var(--veto)">RiskAgent · hard gates</span>'+
+      '<div class="panel-stat"><span class="ps-val veto">3 / 3</span><span class="ps-unit">proposals vetoed</span></div>'+
+      '<div class="panel-section"><span class="label">Why every proposal failed</span>'+
+        '<div class="kv-list">'+
+        '<div class="kv"><span class="kk">Directional bias</span><span class="kv-v veto">100% (cap 80%)</span></div>'+
+        '<div class="kv"><span class="kk">Max concentration</span><span class="kv-v veto">98.2% (cap 50%)</span></div>'+
+        '</div>'+
+        '<p class="panel-reason" style="margin-top:12px">Both active whales are long, so the book would be 100% directional with no hedge &mdash; over the 80% cap. The score-weighted proposal also pushes 98.2% into a single coin, far past the 50% concentration ceiling.</p></div>'+
+      '<div class="panel-section"><span class="label">Verdicts</span>'+cards+'</div>'};
+  },
+  coordinator:function(){
+    return {num:4, title:"Coordinator", body:
+      '<span class="panel-tag">CoordinatorAgent · precedence kelly &gt; score &gt; equal</span>'+
+      '<div class="panel-stat"><span class="ps-val">HELD</span><span class="ps-unit">no rebalance this cycle</span></div>'+
+      '<div class="panel-section"><span class="label">Verdict</span>'+
+        '<p class="panel-reason">'+DECISION.coordinator_reasoning+' With nothing surviving the Risk gate, the Coordinator keeps the existing book rather than force a trade. Holding is a decision, and it is recorded as one.</p></div>'+
+      '<div class="panel-section"><span class="label">Anchored record</span>'+
+        '<div class="kv-list">'+
+        '<div class="kv"><span class="kk">Chosen proposal</span><span class="kv-v veto">none</span></div>'+
+        '<div class="kv"><span class="kk">Traded</span><span class="kv-v">false</span></div>'+
+        '<div class="kv"><span class="kk">Snapshot</span><span class="kv-v">2026-05-25 21:51 UTC</span></div>'+
+        '<div class="kv"><span class="kk">CID</span><span class="kv-v">0x328536b0…a87fcf</span></div>'+
+        '</div></div>'+
+      '<div class="panel-section"><span class="label">Honest limitations</span>'+
+        '<p class="panel-reason" style="color:var(--ink-3)">Realised PnL only (open winners undervalued). Risk caps are heuristic, not distribution-derived. Single-cycle decision with rank-decay memory only.</p></div>'};
+  }
+};
+
+var scrim = $("#scrim"), nodePanel = $("#nodePanel"), buyPanel = $("#buyPanel");
+var lastFocus = null;
+function openPanel(panel){
+  lastFocus = document.activeElement;
+  scrim.classList.add("show"); panel.classList.add("show"); panel.focus();
+  document.body.style.overflow = "hidden";
+}
+function closePanels(){
+  scrim.classList.remove("show"); nodePanel.classList.remove("show"); buyPanel.classList.remove("show");
+  document.body.style.overflow = "";
+  if(lastFocus) lastFocus.focus();
+}
+scrim.addEventListener("click", closePanels);
+$$("[data-close]").forEach(function(b){b.addEventListener("click", closePanels);});
+document.addEventListener("keydown", function(e){ if(e.key==="Escape") closePanels(); });
+
+$$(".node").forEach(function(node){
+  node.addEventListener("click", function(){
+    var data = NODE_CONTENT[node.getAttribute("data-node")]();
+    var n = $("#npNum");
+    n.textContent = data.num;
+    n.style.background = data.veto ? "var(--veto-soft)" : "var(--teal-soft)";
+    n.style.color = data.veto ? "var(--veto)" : "var(--teal)";
+    n.style.borderColor = data.veto ? "var(--veto-line)" : "var(--teal-line)";
+    $("#npTitle").textContent = data.title;
+    $("#npBody").innerHTML = data.body;
+    openPanel(nodePanel);
+  });
+});
+
+var mode = "buy";
+var USDC_BAL = 2500.00, WHALE_BAL = 0;
+var amt = $("#buyAmt"), amtWrap = $("#amtWrap"), amtErr = $("#amtErr");
+var estVal = $("#estVal"), buySubmit = $("#buySubmit");
+
+function setMode(m){
+  mode = m;
+  $("#segBuy").classList.toggle("active", m==="buy");
+  $("#segRedeem").classList.toggle("active", m==="redeem");
+  $("#segBuy").setAttribute("aria-selected", m==="buy");
+  $("#segRedeem").setAttribute("aria-selected", m==="redeem");
+  $("#buyTitle").textContent = m==="buy" ? "Buy WHALE" : "Redeem WHALE";
+  $("#amtLabel").textContent = m==="buy" ? "Amount to spend (USDC)" : "Shares to redeem (WHALE)";
+  $("#amtUnit").textContent = m==="buy" ? "USDC" : "WHALE";
+  $("#estLabel").textContent = m==="buy" ? "Estimated shares" : "Estimated USDC";
+  $("#balLine").textContent = m==="buy" ? "2,500.00 USDC" : "0.0000 WHALE";
+  amt.value = ""; clearErr(); recompute();
+}
+$("#segBuy").addEventListener("click", function(){setMode("buy");});
+$("#segRedeem").addEventListener("click", function(){setMode("redeem");});
+
+function clearErr(){ amtErr.classList.remove("show"); amtWrap.classList.remove("invalid"); }
+function recompute(){
+  var v = parseFloat(amt.value);
+  if(!v || v<=0){
+    estVal.innerHTML = "0<span class=\"dim\">.0000</span> " + (mode==="buy"?"WHALE":"USDC");
+    buySubmit.disabled = true; buySubmit.textContent = "Enter an amount"; return;
+  }
+  if(mode==="buy"){
+    var shares = v / SHARE_PRICE;
+    var i = Math.floor(shares), d = (shares - i).toFixed(4).slice(1);
+    estVal.innerHTML = i.toLocaleString() + "<span class=\"dim\">"+d+"</span> WHALE";
+    buySubmit.textContent = "Buy " + i.toLocaleString() + " WHALE";
+  }else{
+    var usdc = v * SHARE_PRICE;
+    estVal.innerHTML = "$" + Math.floor(usdc).toLocaleString() + "<span class=\"dim\">"+(usdc%1).toFixed(2).slice(1)+"</span>";
+    buySubmit.textContent = "Redeem to USDC";
+  }
+  buySubmit.disabled = false;
+}
+amt.addEventListener("input", function(){ clearErr(); recompute(); });
+amt.addEventListener("blur", function(){
+  var v = parseFloat(amt.value);
+  var max = mode==="buy" ? USDC_BAL : WHALE_BAL;
+  if(amt.value && (!v || v<=0)){
+    amtErr.textContent = "Enter a number greater than zero."; amtErr.classList.add("show"); amtWrap.classList.add("invalid");
+  }else if(v > max){
+    amtErr.textContent = mode==="buy" ? "That's more than your USDC balance." : "You don't hold that many WHALE yet.";
+    amtErr.classList.add("show"); amtWrap.classList.add("invalid");
+  }
+});
+
+buySubmit.addEventListener("click", function(){
+  var v = parseFloat(amt.value);
+  var max = mode==="buy" ? USDC_BAL : WHALE_BAL;
+  if(!v || v<=0 || v>max){
+    amtErr.textContent = mode==="buy" ? "Enter an amount you can cover with your balance." : "You don't hold that many WHALE yet.";
+    amtErr.classList.add("show"); amtWrap.classList.add("invalid"); return;
+  }
+  $("#buyForm").style.display = "none";
+  var settle = $("#settleView"); settle.classList.add("show");
+  var msEl = $("#settleMs");
+  var start = performance.now();
+  var target = 1080 + Math.floor(Math.random()*220);
+  var tick = function(){
+    var ms = Math.min(target, Math.round(performance.now()-start));
+    msEl.textContent = ms;
+    if(ms < target){ requestAnimationFrame(tick); } else { finishSettle(v, target); }
+  };
+  requestAnimationFrame(tick);
+});
+function finishSettle(v, ms){
+  $("#settleView").classList.remove("show");
+  var sv = $("#successView"); sv.classList.add("show");
+  if(mode==="buy"){
+    var shares = (v/SHARE_PRICE).toFixed(4);
+    $("#successHead").textContent = "You hold WHALE.";
+    $("#successDetail").innerHTML = "Received <span class=\"mono\">"+shares+" WHALE</span> for <span class=\"mono\">$"+v.toFixed(2)+"</span>.<br>Settled on Arc in <span class=\"mono\">"+ms+" ms</span>.";
+  }else{
+    var usdc = (v*SHARE_PRICE).toFixed(2);
+    $("#successHead").textContent = "Redeemed to USDC.";
+    $("#successDetail").innerHTML = "Returned <span class=\"mono\">$"+usdc+"</span> for <span class=\"mono\">"+v+" WHALE</span>.<br>Settled on Arc in <span class=\"mono\">"+ms+" ms</span>.";
+  }
+}
+$("#successDone").addEventListener("click", function(){
+  $("#successView").classList.remove("show");
+  $("#buyForm").style.display = "";
+  setMode(mode);
+  closePanels();
+});
+$("#connectBtn").addEventListener("click", function(){
+  setMode("buy"); $("#buyForm").style.display=""; $("#settleView").classList.remove("show"); $("#successView").classList.remove("show");
+  openPanel(buyPanel);
+});
+
+$("#demoError").addEventListener("click", function(){$("#errBand").classList.toggle("show");});
+$("#errRetry").addEventListener("click", function(){$("#errBand").classList.remove("show");});
+$("#demoReload").addEventListener("click", function(){
+  $$(".cell").forEach(function(c){
+    var sk=$("[data-skeleton]",c), ct=$("[data-content]",c);
+    if(sk&&ct){ sk.style.display=""; ct.hidden=true; ct.classList.remove("fade-in"); }
+  });
+  bootDashboard();
+});
+
+window.addEventListener("load", function(){
+  requestAnimationFrame(drawConnectors);
+  setTimeout(drawConnectors, 60);
+  bootDashboard();
+});
+drawConnectors();
+</script>
+</body>
+</html>

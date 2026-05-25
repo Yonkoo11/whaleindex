@@ -11,20 +11,23 @@ phase_0: completed
 phase_1: in_progress
 state_design_output: ai/state-design.md
 
-phase_1.5: pending
-comparables: []
+phase_1.5: completed
+comparables: [Hyperdash, Dune Analytics, Etherscan, Linear, Stripe Dashboard]
 research_output: ai/design-research.md
+research_thesis: "Not a trading terminal — a proof-of-reasoning ledger with a buy button. Whitespace: no competitor designs 'audit the agent'. Crimson Pro for authority moments is a category differentiator."
 
-phase_2: pending
-proposals: []
-dna_codes: []
+phase_2: completed
+proposals: [proposal-1.html (The Ledger), proposal-2.html (The Thesis), proposal-3.html (The Pipeline)]
+dna_codes: [DNA-G-S-M-D-X, DNA-S-T-C-N-E, DNA-B-T-I-M-S]
 
-phase_3: pending
-selected:
+phase_3: completed
+selected: "hybrid: Proposal 3 (The Pipeline) as base + Proposal 2's Crimson Pro thesis hero on landing. Proposal 1's dense decision-ledger becomes the expandable full-record detail view."
+selection_rationale: "P3 makes the 4-agent chain the hero = our 'audit the agent' whitespace + best for agentic/innovation judging. P2's serif thesis is ownable authority in a sans/mono category. Combine the signature visual with the persuasion voice."
 
-phase_4: pending
+phase_4: in_progress
 audit_result:
 issues_fixed:
+production_target: docs/index.html (replace current viewer; wire hybrid design to live Arc RPC + decision-latest.json + attestation + NET-NEW wallet buyer flow)
 
 phase_5: pending
 qa_result:

@@ -1,0 +1,1352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WhaleIndex — The Ledger</title>
+<!--
+================================================================================
+  WHALEINDEX — "THE LEDGER"   ·   DNA-G-S-M-D-X
+  A dense, terminal-grade, provenance-first console.
+  Bloomberg functional density  ×  Etherscan verification rigor.
+================================================================================
+
+  UX ARCHITECTURE
+  ---------------------------------------------------------------------------
+  ENTRY POINTS
+    · Direct URL (read-only, no wallet) — dashboard is the home surface.
+    · "Connect wallet" in left sidebar → opens right slide-in buyer panel.
+
+  EXIT POINTS
+    · Click-to-copy a contract address / hash (leaves a trace, stays on page).
+    · Arcscan deep-link (external, opens explorer in new tab).
+    · Buyer panel: confirm → settling → success → auto-close back to dashboard.
+
+  SCREENS / SURFACES (one scrollable page, three densities)
+    1. LANDING HERO — minimal. One Crimson-Pro thesis line + live NAV +
+       LIVE-RECOMPUTE provenance badge. Jumps fast to the decision record.
+    2. LIVE DASHBOARD — the bulk. Answer → trend → proof descent:
+         NAV KPI + sparkline  →  "since last rebalance" delta strip  →
+         DECISION RECORD (centerpiece: 4-agent chain, scores, vetoes, verdict)
+         →  chain cost/latency compare  →  bonded-whale attestation (empty)
+         →  verified contracts (click-to-copy).
+    3. BUYER FLOW — right slide-in panel: Buy/Redeem segmented control,
+       amount input (validate on blur), estimated shares, confirm→settling→
+       success with a live ms settlement counter (Arc sub-second flex).
+
+  HAPPY PATH (buyer)
+    Connect → right network auto-switch → enter USDC amount → blur validates →
+    review est. shares → Confirm → "settling on Arc" ms counter → success
+    (shares received + tx link) → panel auto-returns to idle.
+
+  STATES DESIGNED
+    · boot: per-widget layout-matched skeletons (no spinner-on-blank).
+    · live: the REAL no-trade decision (11 whales, 3 vetoed proposals, HELD).
+    · rpc_fail: inline error band + retry, rest of page frozen-but-visible.
+    · empty attestation: "no whales bonded yet" (0 staked) — intentional, not broken.
+    · buyer: idle → input → confirm → settling(ms) → success → idle.
+    · provenance: client-side sha256 === on-chain hash, LIVE-RECOMPUTE badge.
+
+  KILL-SWITCH / SAFETY
+    · Dashboard NEVER depends on wallet — read surface always usable.
+    · Contracts are Pausable (IndexToken + RebalanceExecutor); NAVOracle has
+      maxDeltaBps=5000 bound. Surfaced in the "safety primitives" footnote.
+    · No-trade is a positive discipline signal, not a failure.
+    · Buyer amount validated on blur; button disabled during settling.
+    · Demo/synthetic data is always labeled, never disguised as live.
+
+  ACCESSIBILITY
+    · 4.5:1 contrast floor; focus rings via box-shadow (no outline removal w/o
+      replacement); 44px touch targets; aria-labels on every icon button;
+      semantic <button>; labelled inputs; prefers-reduced-motion respected.
+================================================================================
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&family=Crimson+Pro:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    /* --- base canvas --- */
+    --bg:            #0a0c0d;
+    --bg-1:          #0c0e0f;
+    --bg-2:          #101314;
+    --bg-rail:       #0b0d0e;
+    --hair:          rgba(255,255,255,0.07);
+    --hair-strong:   rgba(255,255,255,0.12);
+
+    /* --- ink (hierarchy by weight + opacity, not size) --- */
+    --ink:           rgba(255,255,255,0.92);
+    --ink-full:      rgba(255,255,255,0.96);
+    --ink-mut:       rgba(255,255,255,0.62);
+    --ink-dim:       rgba(255,255,255,0.42);
+    --ink-faint:     rgba(255,255,255,0.26);
+
+    /* --- single accent: teal --- */
+    --teal:          #00d4aa;
+    --teal-soft:     rgba(0,212,170,0.14);
+    --teal-line:     rgba(0,212,170,0.30);
+
+    /* --- semantic red (loss/short/veto/error ONLY) --- */
+    --red:           #ff5d5d;
+    --red-soft:      rgba(255,93,93,0.12);
+    --red-line:      rgba(255,93,93,0.32);
+
+    /* --- amber (pending / stale, semantic-exempt) --- */
+    --amber:         #f0b54a;
+
+    /* --- type --- */
+    --sans:  'DM Sans', system-ui, sans-serif;
+    --mono:  'JetBrains Mono', ui-monospace, monospace;
+    --serif: 'Crimson Pro', Georgia, serif;
+
+    /* --- spacing (8px base) --- */
+    --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px; --s8: 64px;
+
+    --ease: cubic-bezier(0.22,1,0.36,1);
+    --rail-w: 248px;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.5;
+    letter-spacing: -0.011em;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection { background: var(--teal-soft); color: var(--ink-full); }
+
+  /* faint top-left grain so the charcoal never reads flat (no gradient) */
+  body::before {
+    content: "";
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background:
+      radial-gradient(900px 520px at 18% -8%, rgba(0,212,170,0.05), transparent 70%);
+  }
+
+  a { color: inherit; text-decoration: none; }
+
+  .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+  .label {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--ink-dim); font-weight: 500;
+  }
+  .num-dim { opacity: 0.6; }
+  .pos { color: var(--teal); }
+  .neg { color: var(--red); }
+
+  /* focus ring via box-shadow, never bare outline removal */
+  :focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--teal-line);
+    border-radius: 4px;
+  }
+
+  /* ============================ SHELL ============================ */
+  .shell { display: grid; grid-template-columns: var(--rail-w) 1fr; min-height: 100vh; position: relative; z-index: 1; }
+
+  /* ---- left sidebar ---- */
+  .rail {
+    border-right: 1px solid var(--hair);
+    background: var(--bg-rail);
+    padding: var(--s5) var(--s4);
+    position: sticky; top: 0; height: 100vh;
+    display: flex; flex-direction: column; gap: var(--s5);
+  }
+  .brand { display: flex; align-items: center; gap: var(--s3); }
+  .brand-mark {
+    width: 30px; height: 30px; flex: 0 0 30px;
+    border: 1px solid var(--teal-line); border-radius: 6px;
+    display: grid; place-items: center;
+  }
+  .brand-mark svg { width: 16px; height: 16px; }
+  .brand-name { font-weight: 700; letter-spacing: -0.022em; font-size: 15px; color: var(--ink-full); }
+  .brand-sub { display: block; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-dim); margin-top: 1px; }
+
+  .nav { display: flex; flex-direction: column; gap: 2px; }
+  .nav-item {
+    display: flex; align-items: center; gap: var(--s3);
+    padding: 9px var(--s3); border-radius: 6px;
+    color: var(--ink-mut); font-weight: 500; font-size: 13px;
+    min-height: 40px;
+    transition: background 150ms var(--ease), color 150ms var(--ease);
+    cursor: pointer; border: 1px solid transparent;
+  }
+  .nav-item:hover { background: rgba(255,255,255,0.035); color: var(--ink); }
+  .nav-item.active { color: var(--ink-full); background: rgba(255,255,255,0.05); border-color: var(--hair); }
+  .nav-item svg { width: 15px; height: 15px; opacity: 0.8; flex: 0 0 15px; }
+  .nav-item.active svg { color: var(--teal); opacity: 1; }
+
+  .rail-spacer { flex: 1; }
+
+  .rail-status {
+    border-top: 1px solid var(--hair); padding-top: var(--s4);
+    display: flex; flex-direction: column; gap: var(--s2);
+  }
+  .rpc-line { display: flex; align-items: center; gap: var(--s2); font-size: 12px; color: var(--ink-mut); }
+  .dot { width: 6px; height: 6px; border-radius: 50%; flex: 0 0 6px; }
+  .dot-ok { background: var(--teal); box-shadow: 0 0 0 3px var(--teal-soft); }
+  .dot-amber { background: var(--amber); }
+
+  .btn-connect {
+    margin-top: var(--s2);
+    width: 100%; min-height: 44px;
+    background: var(--teal); color: #04201a;
+    border: none; border-radius: 7px;
+    font-family: var(--sans); font-weight: 600; font-size: 13.5px; letter-spacing: -0.01em;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; gap: var(--s2);
+    transition: transform 150ms var(--ease), opacity 150ms var(--ease);
+  }
+  .btn-connect:hover { opacity: 0.9; }
+  .btn-connect:active { transform: translateY(1px); }
+  .btn-connect svg { width: 15px; height: 15px; }
+
+  /* ---- main column ---- */
+  .main { min-width: 0; }
+  .topbar {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: var(--s4) var(--s6);
+    border-bottom: 1px solid var(--hair);
+    background: rgba(10,12,13,0.86);
+    backdrop-filter: blur(8px);
+  }
+  .crumb { display: flex; align-items: center; gap: var(--s3); font-size: 13px; color: var(--ink-mut); }
+  .crumb .mono { color: var(--ink); }
+  .refresh {
+    display: flex; align-items: center; gap: var(--s2);
+    font-size: 12px; color: var(--ink-dim);
+  }
+  .refresh-btn {
+    background: transparent; border: 1px solid var(--hair); color: var(--ink-mut);
+    width: 32px; height: 32px; border-radius: 6px; display: grid; place-items: center; cursor: pointer;
+    transition: background 150ms var(--ease), color 150ms var(--ease);
+  }
+  .refresh-btn:hover { background: rgba(255,255,255,0.04); color: var(--ink); }
+  .refresh-btn svg { width: 14px; height: 14px; }
+
+  .container { padding: var(--s6); max-width: 1180px; }
+
+  /* ============================ HERO (minimal) ============================ */
+  .hero { padding-bottom: var(--s6); border-bottom: 1px solid var(--hair); margin-bottom: var(--s6); }
+  .hero-tag { display: inline-flex; align-items: center; gap: var(--s2); margin-bottom: var(--s4); }
+  .hero-tag .label { color: var(--ink-mut); }
+  .hero-thesis {
+    font-family: var(--serif); font-weight: 400; font-style: italic;
+    font-size: 27px; line-height: 1.32; letter-spacing: -0.01em;
+    color: var(--ink-full); max-width: 30ch; margin: 0 0 var(--s5);
+  }
+  .hero-thesis .em { font-style: normal; color: var(--teal); }
+  .hero-grid { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: var(--s7); align-items: end; }
+
+  /* NAV KPI */
+  .nav-kpi { display: flex; flex-direction: column; gap: var(--s2); }
+  .nav-value {
+    font-family: var(--mono); font-variant-numeric: tabular-nums;
+    font-weight: 600; font-size: 52px; line-height: 1; letter-spacing: -0.02em;
+    color: var(--ink-full); display: flex; align-items: baseline;
+  }
+  .nav-value .cur { font-size: 30px; opacity: 0.55; font-weight: 500; margin-right: 2px; }
+  .nav-value .dec { opacity: 0.55; }
+  .nav-meta { display: flex; align-items: center; gap: var(--s4); flex-wrap: wrap; }
+  .trend-pill {
+    font-family: var(--mono); font-variant-numeric: tabular-nums;
+    font-size: 12px; font-weight: 600; letter-spacing: 0.02em;
+    padding: 3px 8px; border-radius: 5px; background: var(--teal-soft); color: var(--teal);
+  }
+
+  /* provenance badge — LIVE RECOMPUTE */
+  .prov {
+    display: inline-flex; align-items: center; gap: var(--s2);
+    border: 1px solid var(--teal-line); background: var(--teal-soft);
+    border-radius: 7px; padding: 7px 11px; cursor: default; position: relative;
+  }
+  .prov .check {
+    width: 16px; height: 16px; flex: 0 0 16px; color: var(--teal);
+  }
+  .prov-text { display: flex; flex-direction: column; line-height: 1.25; }
+  .prov-text b { font-size: 12px; font-weight: 600; color: var(--ink-full); letter-spacing: -0.005em; }
+  .prov-text span { font-size: 11px; color: var(--ink-mut); }
+  .prov-tip {
+    position: absolute; bottom: calc(100% + 8px); left: 0;
+    width: 304px; padding: 10px 12px; border-radius: 8px;
+    background: var(--bg-2); border: 1px solid var(--hair-strong);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    font-family: var(--mono); font-size: 11px; line-height: 1.55; color: var(--ink-mut);
+    opacity: 0; transform: translateY(4px); pointer-events: none;
+    transition: opacity 150ms var(--ease), transform 150ms var(--ease); z-index: 30;
+  }
+  .prov:hover .prov-tip, .prov:focus-within .prov-tip { opacity: 1; transform: translateY(0); }
+  .prov-tip .ok { color: var(--teal); }
+
+  /* sparkline */
+  .spark-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: var(--s2); }
+  .spark { width: 220px; height: 56px; display: block; }
+  .spark-cap { font-size: 11px; color: var(--ink-dim); letter-spacing: 0.04em; text-transform: uppercase; }
+
+  /* ============================ SECTION PRIMITIVE ============================ */
+  .section { padding: var(--s6) 0; border-bottom: 1px solid var(--hair); }
+  .section:last-child { border-bottom: none; }
+  .sec-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: var(--s5); gap: var(--s4); }
+  .sec-title { font-weight: 600; font-size: 16px; letter-spacing: -0.022em; color: var(--ink-full); }
+  .sec-note { font-size: 12px; color: var(--ink-dim); }
+
+  /* ---- delta strip (no-trade variant) ---- */
+  .delta-strip {
+    display: flex; align-items: stretch; gap: 0;
+    border: 1px solid var(--hair); border-radius: 9px; overflow: hidden;
+    background: var(--bg-1);
+  }
+  .delta-cell { padding: var(--s4) var(--s5); display: flex; flex-direction: column; gap: 5px; flex: 1; border-right: 1px solid var(--hair); }
+  .delta-cell:last-child { border-right: none; }
+  .delta-val { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 600; font-size: 18px; color: var(--ink-full); letter-spacing: -0.01em; }
+  .delta-val.held { display: inline-flex; align-items: center; gap: var(--s2); color: var(--teal); }
+  .delta-val.held svg { width: 14px; height: 14px; }
+  .delta-cell .label { font-size: 11px; }
+
+  /* ============================ DECISION RECORD (centerpiece) ============================ */
+  .record-frame { border: 1px solid var(--hair); border-radius: 11px; overflow: hidden; background: var(--bg-1); }
+  .record-top {
+    display: flex; align-items: center; justify-content: space-between; gap: var(--s4);
+    padding: var(--s4) var(--s5); border-bottom: 1px solid var(--hair); flex-wrap: wrap;
+  }
+  .verdict-held {
+    display: inline-flex; align-items: center; gap: var(--s2);
+    font-family: var(--mono); font-weight: 600; font-size: 13px; letter-spacing: 0.04em;
+    color: var(--teal); padding: 5px 10px; border: 1px solid var(--teal-line); border-radius: 6px; background: var(--teal-soft);
+  }
+  .verdict-held svg { width: 13px; height: 13px; }
+  .record-meta { display: flex; align-items: center; gap: var(--s5); flex-wrap: wrap; }
+  .meta-pair { display: flex; flex-direction: column; gap: 2px; }
+  .meta-pair .label { font-size: 11px; }
+  .meta-pair .v { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 13px; color: var(--ink); }
+  .btn-raw {
+    background: transparent; border: 1px solid var(--hair); color: var(--ink-mut);
+    font-family: var(--mono); font-size: 12px; padding: 7px 11px; border-radius: 6px;
+    cursor: pointer; min-height: 36px; display: inline-flex; align-items: center; gap: var(--s2);
+    transition: background 150ms var(--ease), color 150ms var(--ease);
+  }
+  .btn-raw:hover { background: rgba(255,255,255,0.04); color: var(--ink); }
+  .btn-raw svg { width: 13px; height: 13px; }
+
+  /* pipeline: Scorer -> Allocator -> Risk -> Coordinator */
+  .pipeline { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; padding: var(--s5); }
+  .pnode {
+    position: relative; padding: var(--s4); border: 1px solid var(--hair); border-radius: 9px;
+    margin-right: var(--s5); background: var(--bg-2); cursor: pointer;
+    transition: border-color 150ms var(--ease), transform 150ms var(--ease);
+    display: flex; flex-direction: column; gap: var(--s3); min-height: 132px;
+  }
+  .pnode:last-child { margin-right: 0; }
+  .pnode:hover { border-color: var(--hair-strong); transform: translateY(-1px); }
+  .pnode.veto { border-color: var(--red-line); }
+  .pnode.final { border-color: var(--teal-line); }
+  /* connecting hairline + arrow between nodes */
+  .pnode:not(:last-child)::after {
+    content: ""; position: absolute; top: 50%; right: calc(-1 * var(--s5)); width: var(--s5); height: 1px;
+    background: var(--hair-strong);
+  }
+  .pnode:not(:last-child)::before {
+    content: ""; position: absolute; top: 50%; right: calc(-1 * var(--s5) + 1px);
+    transform: translateY(-50%); border: 4px solid transparent; border-left-color: var(--hair-strong);
+  }
+  .pnode-head { display: flex; align-items: center; gap: var(--s2); }
+  .pnode-idx { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); }
+  .pnode-name { font-weight: 600; font-size: 13px; color: var(--ink-full); letter-spacing: -0.01em; }
+  .pnode-io { font-size: 12px; color: var(--ink-mut); line-height: 1.45; flex: 1; }
+  .pnode-io .mono { color: var(--ink); }
+  .pnode-conf { display: flex; align-items: center; justify-content: space-between; padding-top: var(--s2); border-top: 1px solid var(--hair); }
+  .pnode-conf .label { font-size: 10px; }
+  .pnode-conf .mono { font-size: 12px; font-weight: 600; }
+  .veto-tag { color: var(--red); }
+  .hold-tag { color: var(--teal); }
+  .pnode-more { font-size: 11px; color: var(--ink-dim); display: inline-flex; align-items: center; gap: 4px; }
+  .pnode-more svg { width: 11px; height: 11px; }
+
+  /* scores table */
+  .sub { padding: 0 var(--s5) var(--s5); }
+  .sub-head { display: flex; align-items: center; gap: var(--s2); padding: var(--s4) 0 var(--s3); }
+  .sub-head .label { color: var(--ink-mut); }
+  table.scores { width: 100%; border-collapse: collapse; }
+  table.scores th, table.scores td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--hair); }
+  table.scores th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-dim); font-weight: 500; }
+  table.scores td { font-size: 13px; color: var(--ink); }
+  table.scores td.r, table.scores th.r { text-align: right; }
+  table.scores tr:last-child td { border-bottom: none; }
+  .addr { font-family: var(--mono); font-size: 12.5px; color: var(--ink); }
+  .scorebar { display: inline-flex; align-items: center; gap: var(--s2); justify-content: flex-end; }
+  .scorebar .track { width: 64px; height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
+  .scorebar .fill { height: 100%; background: var(--teal); border-radius: 2px; }
+  .scoreval { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 600; min-width: 46px; display: inline-block; }
+  .flag {
+    font-family: var(--mono); font-size: 10px; padding: 2px 6px; border-radius: 4px;
+    background: rgba(255,255,255,0.05); color: var(--ink-mut); letter-spacing: 0.02em;
+  }
+  .flag.hype { color: var(--amber); background: rgba(240,181,74,0.10); }
+  .scores-foot { font-size: 12px; color: var(--ink-dim); padding-top: var(--s3); }
+
+  /* veto ledger */
+  .veto-ledger { display: flex; flex-direction: column; gap: var(--s3); padding: var(--s4) var(--s5) var(--s5); border-top: 1px solid var(--hair); }
+  .veto-row { display: grid; grid-template-columns: 160px 1fr auto; gap: var(--s4); align-items: center; padding: var(--s3) 0; border-bottom: 1px solid var(--hair); }
+  .veto-row:last-child { border-bottom: none; }
+  .vp-name { font-family: var(--mono); font-size: 13px; color: var(--ink-full); }
+  .vp-reasons { display: flex; flex-direction: column; gap: 3px; }
+  .vp-reason { font-size: 12.5px; color: var(--ink-mut); display: flex; align-items: center; gap: var(--s2); }
+  .vp-reason .mono { color: var(--red); }
+  .vp-reason svg { width: 12px; height: 12px; color: var(--red); flex: 0 0 12px; }
+  .vp-badge {
+    font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+    color: var(--red); border: 1px solid var(--red-line); background: var(--red-soft);
+    padding: 4px 9px; border-radius: 5px;
+  }
+
+  /* ============================ CHAIN COMPARE ============================ */
+  .compare { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--hair); border-radius: 9px; overflow: hidden; background: var(--bg-1); }
+  .crow { display: grid; grid-template-columns: 120px 1fr 96px 96px; align-items: center; gap: var(--s4); padding: var(--s4) var(--s5); border-bottom: 1px solid var(--hair); }
+  .crow:last-child { border-bottom: none; }
+  .crow.head { padding-top: var(--s3); padding-bottom: var(--s3); }
+  .crow.head span { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-dim); }
+  .crow.head .r { text-align: right; }
+  .cname { display: flex; align-items: center; gap: var(--s2); font-weight: 500; font-size: 13.5px; color: var(--ink); }
+  .cname.win { color: var(--ink-full); }
+  .cname .star { color: var(--teal); width: 13px; height: 13px; }
+  .cbar-track { height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; }
+  .cbar { height: 100%; border-radius: 3px; }
+  .cbar.win { background: var(--teal); }
+  .cbar.alt { background: rgba(255,255,255,0.20); }
+  .cval { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 13px; text-align: right; color: var(--ink); }
+  .cval.win { color: var(--teal); font-weight: 600; }
+
+  /* ============================ ATTESTATION (empty) ============================ */
+  .attest-empty {
+    border: 1px dashed var(--hair-strong); border-radius: 11px; background: var(--bg-1);
+    padding: var(--s7) var(--s6); display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--s4);
+  }
+  .attest-icon { width: 40px; height: 40px; color: var(--ink-faint); }
+  .attest-claim {
+    font-family: var(--serif); font-style: italic; font-size: 18px; color: var(--ink); max-width: 44ch; line-height: 1.4;
+  }
+  .attest-stat { display: flex; gap: var(--s7); margin-top: var(--s2); }
+  .attest-stat .v { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 600; font-size: 22px; color: var(--ink-full); }
+  .attest-stat .label { margin-top: 4px; }
+
+  /* ============================ CONTRACTS ============================ */
+  .contracts { display: flex; flex-direction: column; border: 1px solid var(--hair); border-radius: 9px; overflow: hidden; background: var(--bg-1); }
+  .crow2 { display: grid; grid-template-columns: 180px 1fr auto auto; gap: var(--s4); align-items: center; padding: 13px var(--s5); border-bottom: 1px solid var(--hair); }
+  .crow2:last-child { border-bottom: none; }
+  .crow2:hover { background: rgba(255,255,255,0.02); }
+  .cn-name { display: flex; align-items: center; gap: var(--s2); font-weight: 500; font-size: 13.5px; color: var(--ink); }
+  .cn-name .vchk { width: 14px; height: 14px; color: var(--teal); }
+  .copy-addr {
+    font-family: var(--mono); font-size: 12.5px; color: var(--ink-mut);
+    background: transparent; border: none; cursor: pointer; padding: 4px 6px; border-radius: 5px;
+    display: inline-flex; align-items: center; gap: var(--s2); text-align: left;
+    transition: background 150ms var(--ease), color 150ms var(--ease); min-height: 32px;
+  }
+  .copy-addr:hover { background: rgba(255,255,255,0.04); color: var(--ink); }
+  .copy-addr svg { width: 13px; height: 13px; opacity: 0.6; }
+  .copy-addr.copied { color: var(--teal); }
+  .arcscan {
+    font-size: 12px; color: var(--ink-dim); display: inline-flex; align-items: center; gap: 4px;
+    transition: color 150ms var(--ease);
+  }
+  .arcscan:hover { color: var(--teal); }
+  .arcscan svg { width: 12px; height: 12px; }
+  .demo-pill { font-family: var(--mono); font-size: 10px; color: var(--amber); border: 1px solid rgba(240,181,74,0.3); padding: 2px 6px; border-radius: 4px; }
+
+  /* ============================ RPC ERROR BAND ============================ */
+  .err-band {
+    display: none; align-items: center; gap: var(--s4); padding: var(--s4) var(--s5);
+    border: 1px solid var(--red-line); background: var(--red-soft); border-radius: 9px; margin-bottom: var(--s6);
+  }
+  .err-band.show { display: flex; }
+  .err-band svg { width: 18px; height: 18px; color: var(--red); flex: 0 0 18px; }
+  .err-band .txt { flex: 1; font-size: 13px; color: var(--ink); }
+  .err-band .txt b { color: var(--ink-full); font-weight: 600; }
+  .btn-retry {
+    background: transparent; border: 1px solid var(--red-line); color: var(--red);
+    font-family: var(--sans); font-weight: 600; font-size: 12.5px; padding: 8px 14px; border-radius: 6px;
+    cursor: pointer; min-height: 36px; transition: background 150ms var(--ease);
+  }
+  .btn-retry:hover { background: var(--red-soft); }
+
+  /* ============================ SKELETON ============================ */
+  .skel { background: rgba(255,255,255,0.05); border-radius: 5px; position: relative; overflow: hidden; }
+  .skel::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.045), transparent);
+    transform: translateX(-100%); animation: shimmer 1.4s infinite;
+  }
+  @keyframes shimmer { 100% { transform: translateX(100%); } }
+  .skel-wrap { display: none; }
+  .skel-wrap.show { display: block; }
+  .live-wrap.hide { display: none; }
+
+  /* ============================ DNA BADGE ============================ */
+  .dna {
+    position: fixed; top: 14px; right: 16px; z-index: 60;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em;
+    color: var(--ink-mut); border: 1px solid var(--hair); background: rgba(12,14,15,0.8);
+    backdrop-filter: blur(6px); padding: 6px 10px; border-radius: 6px;
+  }
+  .dna b { color: var(--teal); font-weight: 600; }
+
+  /* ============================ BUYER PANEL ============================ */
+  .scrim {
+    position: fixed; inset: 0; background: rgba(4,6,7,0.55); z-index: 80;
+    opacity: 0; pointer-events: none; transition: opacity 200ms var(--ease);
+  }
+  .scrim.open { opacity: 1; pointer-events: auto; }
+  .panel {
+    position: fixed; top: 0; right: 0; height: 100vh; width: 412px; max-width: 92vw; z-index: 90;
+    background: var(--bg-1); border-left: 1px solid var(--hair-strong);
+    transform: translateX(100%); transition: transform 200ms var(--ease);
+    display: flex; flex-direction: column; box-shadow: -24px 0 60px rgba(0,0,0,0.45);
+  }
+  .panel.open { transform: translateX(0); }
+  .panel-head { display: flex; align-items: center; justify-content: space-between; padding: var(--s5); border-bottom: 1px solid var(--hair); }
+  .panel-title { font-weight: 600; font-size: 15px; letter-spacing: -0.022em; color: var(--ink-full); }
+  .panel-close {
+    background: transparent; border: 1px solid var(--hair); color: var(--ink-mut);
+    width: 34px; height: 34px; border-radius: 6px; cursor: pointer; display: grid; place-items: center;
+    transition: background 150ms var(--ease), color 150ms var(--ease);
+  }
+  .panel-close:hover { background: rgba(255,255,255,0.04); color: var(--ink); }
+  .panel-close svg { width: 14px; height: 14px; }
+  .panel-body { padding: var(--s5); display: flex; flex-direction: column; gap: var(--s5); overflow-y: auto; flex: 1; }
+
+  .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; border: 1px solid var(--hair); border-radius: 8px; background: var(--bg-2); }
+  .seg button {
+    background: transparent; border: none; color: var(--ink-mut); font-family: var(--sans);
+    font-weight: 600; font-size: 13px; padding: 9px; border-radius: 6px; cursor: pointer; min-height: 40px;
+    transition: background 150ms var(--ease), color 150ms var(--ease);
+  }
+  .seg button.active { background: rgba(255,255,255,0.07); color: var(--ink-full); }
+
+  .field { display: flex; flex-direction: column; gap: var(--s2); }
+  .field label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-dim); font-weight: 500; }
+  .input-shell {
+    display: flex; align-items: center; gap: var(--s2); border: 1px solid var(--hair); border-radius: 8px;
+    background: var(--bg-2); padding: 0 var(--s4); transition: border-color 150ms var(--ease);
+  }
+  .input-shell:focus-within { border-color: var(--teal-line); }
+  .input-shell.invalid { border-color: var(--red-line); }
+  .input-shell .cur { font-family: var(--mono); color: var(--ink-dim); font-size: 14px; }
+  .input-shell input {
+    flex: 1; background: transparent; border: none; color: var(--ink-full);
+    font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 16px; padding: 13px 0;
+  }
+  .input-shell input:focus { outline: none; }
+  .input-shell input::placeholder { color: var(--ink-faint); }
+  .field-help { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--ink-dim); }
+  .field-help .mono { color: var(--ink-mut); cursor: pointer; }
+  .field-err { font-size: 12px; color: var(--red); display: none; }
+  .field-err.show { display: block; }
+
+  .estimate { display: flex; flex-direction: column; gap: var(--s3); border: 1px solid var(--hair); border-radius: 9px; padding: var(--s4); background: var(--bg-2); }
+  .est-row { display: flex; align-items: center; justify-content: space-between; }
+  .est-row .label { font-size: 12px; }
+  .est-row .v { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 14px; color: var(--ink); }
+  .est-row.big .v { font-size: 18px; font-weight: 600; color: var(--ink-full); }
+
+  .btn-action {
+    width: 100%; min-height: 48px; background: var(--teal); color: #04201a; border: none; border-radius: 8px;
+    font-family: var(--sans); font-weight: 600; font-size: 14px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: var(--s2);
+    transition: opacity 150ms var(--ease), transform 150ms var(--ease);
+  }
+  .btn-action:hover { opacity: 0.92; }
+  .btn-action:active { transform: translateY(1px); }
+  .btn-action:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-action svg { width: 15px; height: 15px; }
+
+  .settle { display: none; flex-direction: column; align-items: center; gap: var(--s3); padding: var(--s5) 0; text-align: center; }
+  .settle.show { display: flex; }
+  .settle-ring { width: 30px; height: 30px; }
+  .settle-ring circle { fill: none; stroke: var(--teal); stroke-width: 2.5; stroke-dasharray: 60; stroke-dashoffset: 20; transform-origin: center; animation: spin 0.9s linear infinite; }
+  @keyframes spin { 100% { transform: rotate(360deg); } }
+  .settle .ms { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 30px; font-weight: 600; color: var(--ink-full); }
+  .settle .lbl { font-size: 12.5px; color: var(--ink-mut); }
+
+  .success { display: none; flex-direction: column; gap: var(--s4); padding: var(--s4) 0; }
+  .success.show { display: flex; }
+  .success-head { display: flex; align-items: center; gap: var(--s3); }
+  .success-chk { width: 34px; height: 34px; color: var(--teal); flex: 0 0 34px; }
+  .success-head .t { font-weight: 600; font-size: 15px; color: var(--ink-full); }
+  .success-head .s { font-size: 12.5px; color: var(--ink-mut); }
+  .success-tx { font-family: var(--mono); font-size: 12px; color: var(--teal); display: inline-flex; align-items: center; gap: 5px; }
+  .success-tx svg { width: 12px; height: 12px; }
+
+  .panel-note { font-size: 11.5px; color: var(--ink-dim); line-height: 1.5; padding-top: var(--s4); border-top: 1px solid var(--hair); }
+
+  /* ============================ COPY TOAST ============================ */
+  .toast {
+    position: fixed; bottom: 22px; left: 50%; z-index: 120;
+    transform: translateX(-50%) translateY(12px);
+    background: var(--bg-2); border: 1px solid var(--hair-strong); color: var(--ink-full);
+    font-size: 13px; padding: 10px 16px; border-radius: 8px; box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    opacity: 0; pointer-events: none; transition: opacity 150ms var(--ease), transform 150ms var(--ease);
+    display: inline-flex; align-items: center; gap: var(--s2);
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast svg { width: 14px; height: 14px; color: var(--teal); }
+
+  /* ============================ FOOTER ============================ */
+  .foot { padding: var(--s6); border-top: 1px solid var(--hair); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--s4); }
+  .foot-cite { font-size: 12px; color: var(--ink-dim); max-width: 56ch; line-height: 1.6; }
+  .foot-cite b { color: var(--ink-mut); font-weight: 500; }
+  .foot-dna { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); letter-spacing: 0.06em; }
+
+  /* ============================ RESPONSIVE ============================ */
+  @media (max-width: 900px) {
+    .shell { grid-template-columns: 1fr; }
+    .rail {
+      position: static; height: auto; flex-direction: row; align-items: center; flex-wrap: wrap;
+      gap: var(--s4); padding: var(--s4);
+    }
+    .nav { flex-direction: row; flex-wrap: wrap; }
+    .rail-spacer { display: none; }
+    .rail-status { border-top: none; padding-top: 0; flex-direction: row; align-items: center; gap: var(--s4); flex-wrap: wrap; }
+    .btn-connect { width: auto; margin-top: 0; padding: 0 var(--s4); }
+    .topbar { padding: var(--s4); }
+    .container { padding: var(--s5) var(--s4); }
+    .hero-grid { grid-template-columns: 1fr; gap: var(--s5); align-items: start; }
+    .spark-wrap { align-items: flex-start; }
+    .pipeline { grid-template-columns: 1fr; gap: var(--s4); }
+    .pnode { margin-right: 0; }
+    .pnode:not(:last-child)::after { top: auto; bottom: calc(-1 * var(--s4)); right: 50%; width: 1px; height: var(--s4); }
+    .pnode:not(:last-child)::before { top: auto; bottom: calc(-1 * var(--s4) + 1px); right: 50%; transform: translateX(50%); border: 4px solid transparent; border-top-color: var(--hair-strong); border-left-color: transparent; }
+    .delta-strip { flex-direction: column; }
+    .delta-cell { border-right: none; border-bottom: 1px solid var(--hair); }
+    .delta-cell:last-child { border-bottom: none; }
+  }
+  @media (max-width: 560px) {
+    .nav-value { font-size: 40px; }
+    .nav-value .cur { font-size: 24px; }
+    .hero-thesis { font-size: 22px; }
+    .spark { width: 100%; }
+    .crow { grid-template-columns: 88px 1fr 70px; }
+    .crow .cval:last-child { display: none; }
+    .crow.head span:last-child { display: none; }
+    .crow2 { grid-template-columns: 1fr; gap: var(--s2); }
+    .veto-row { grid-template-columns: 1fr; gap: var(--s2); }
+    .panel { width: 100%; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="dna" aria-label="Design DNA code">DNA-<b>G-S-M-D-X</b></div>
+
+<div class="shell">
+  <!-- ===================== LEFT SIDEBAR ===================== -->
+  <aside class="rail">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#00d4aa" stroke-width="1.6"><path d="M3 14c2.5 0 2.5-3 5-3s2.5 3 5 3 2.5-3 5-3"/><path d="M3 18c2.5 0 2.5-3 5-3s2.5 3 5 3 2.5-3 5-3"/><circle cx="16.5" cy="7.5" r="1.4" fill="#00d4aa" stroke="none"/></svg>
+      </span>
+      <span>
+        <span class="brand-name">WhaleIndex</span>
+        <span class="brand-sub">The Ledger</span>
+      </span>
+    </div>
+
+    <nav class="nav" aria-label="Primary">
+      <a class="nav-item active" aria-current="page">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 13h4l2 5 4-12 2 7h4"/></svg>
+        Decision Record
+      </a>
+      <a class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6M9 13h6M9 17h3"/></svg>
+        Rebalance History
+      </a>
+      <a class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        Whale Scores
+      </a>
+      <a class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg>
+        Attestation
+      </a>
+      <a class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 3v4M16 3v4M4 9h16M5 5h14a1 1 0 011 1v13a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1z"/></svg>
+        Contracts
+      </a>
+    </nav>
+
+    <div class="rail-spacer"></div>
+
+    <div class="rail-status">
+      <div class="rpc-line"><span class="dot dot-ok" aria-hidden="true"></span> Arc Testnet · chain 5042002</div>
+      <div class="rpc-line"><span class="dot dot-amber" aria-hidden="true"></span> NAV oracle · fresh</div>
+      <button class="btn-connect" id="connectBtn" aria-haspopup="dialog">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h13a3 3 0 013 3v6a3 3 0 01-3 3H5a2 2 0 01-2-2V7z"/><path d="M3 7l4-3h9"/><circle cx="16" cy="13" r="1.4" fill="#04201a" stroke="none"/></svg>
+        Connect wallet
+      </button>
+    </div>
+  </aside>
+
+  <!-- ===================== MAIN ===================== -->
+  <div class="main">
+    <div class="topbar">
+      <div class="crumb">
+        <span>Decision</span>
+        <span style="color:var(--ink-faint)">/</span>
+        <span class="mono">cid 328536b0…a87fcf</span>
+      </div>
+      <div class="refresh">
+        <span>updated <span class="mono">12s</span> ago · next in <span class="mono">3s</span></span>
+        <button class="refresh-btn" id="refreshBtn" aria-label="Refresh data now">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 11a8 8 0 10-2.3 5.7M20 4v5h-5"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="container">
+
+      <!-- RPC ERROR BAND (toggle-able demo of rpc_fail state) -->
+      <div class="err-band" id="errBand" role="alert">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.4 18a2 2 0 001.7 3h15.8a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
+        <span class="txt"><b>RPC unreachable.</b> Primary and fallback Arc nodes did not respond. Cached data shown below; live reads paused.</span>
+        <button class="btn-retry" onclick="document.getElementById('errBand').classList.remove('show')">Retry connection</button>
+      </div>
+
+      <!-- ===================== HERO ===================== -->
+      <header class="hero">
+        <div class="hero-tag">
+          <span class="label">USDC index · Hyperliquid whale mirror · Arc L1</span>
+        </div>
+        <p class="hero-thesis">
+          Don't trust the agent. <span class="em">Recompute its reasoning</span> — every rebalance is a hashed decision record anchored on-chain.
+        </p>
+
+        <div class="hero-grid">
+          <!-- NAV KPI -->
+          <div class="nav-kpi">
+            <span class="label">Net asset value · per WHALE share</span>
+            <!-- LIVE -->
+            <div class="live-wrap" id="navLive">
+              <div class="nav-value">
+                <span class="cur">$</span>1.0000<span class="dec"></span>
+              </div>
+              <div class="nav-meta" style="margin-top:14px">
+                <span class="trend-pill">+0.00% since inception</span>
+                <!-- PROVENANCE BADGE -->
+                <span class="prov" tabindex="0" role="button" aria-label="Reasoning verified: client-side hash matches on-chain anchor">
+                  <svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.2l2.3 2.3 4.7-4.9"/></svg>
+                  <span class="prov-text">
+                    <b>Reasoning verified</b>
+                    <span>sha256 matches on-chain anchor</span>
+                  </span>
+                  <span class="prov-tip" role="tooltip">
+                    <span class="ok">✓ LIVE-RECOMPUTE</span><br>
+                    Your browser hashed the decision JSON:<br>
+                    sha256 === <span class="ok">0x328536b0…a87fcf</span><br>
+                    anchored · AllocationDecided · block 1,284,019<br>
+                    snapshot 2026-05-25T21:51:23Z
+                  </span>
+                </span>
+              </div>
+            </div>
+            <!-- SKELETON -->
+            <div class="skel-wrap" id="navSkel">
+              <div class="skel" style="width:240px;height:52px;margin-top:4px"></div>
+              <div class="skel" style="width:300px;height:22px;margin-top:16px"></div>
+            </div>
+          </div>
+
+          <!-- SPARKLINE (axis-less) -->
+          <div class="spark-wrap">
+            <svg class="spark" viewBox="0 0 220 56" preserveAspectRatio="none" aria-label="NAV trend since inception, flat at parity">
+              <polyline fill="none" stroke="#00d4aa" stroke-width="1.6" stroke-linejoin="round"
+                points="0,30 22,29 44,31 66,28 88,30 110,29 132,30 154,29 176,30 198,29 220,30"/>
+              <circle cx="220" cy="30" r="2.4" fill="#00d4aa"/>
+            </svg>
+            <span class="spark-cap">NAV since inception · seeded at parity</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- ===================== DELTA STRIP (no-trade) ===================== -->
+      <section class="section" aria-label="Since last rebalance">
+        <div class="sec-head">
+          <h2 class="sec-title">Since last decision</h2>
+          <span class="sec-note">snapshot 2026-05-25 · 30-day realised PnL window</span>
+        </div>
+        <div class="delta-strip">
+          <div class="delta-cell">
+            <span class="delta-val">0</span>
+            <span class="label">position changes</span>
+          </div>
+          <div class="delta-cell">
+            <span class="delta-val held">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.2l2.3 2.3 4.7-4.9"/></svg>
+              agent held
+            </span>
+            <span class="label">coordinator verdict</span>
+          </div>
+          <div class="delta-cell">
+            <span class="delta-val">11</span>
+            <span class="label">whales scored</span>
+          </div>
+          <div class="delta-cell">
+            <span class="delta-val held">anchored ✓</span>
+            <span class="label">reasoning provenance</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== DECISION RECORD ===================== -->
+      <section class="section" aria-label="Decision record">
+        <div class="sec-head">
+          <h2 class="sec-title">Decision record</h2>
+          <span class="sec-note">Scorer → Allocator → Risk → Coordinator · AUM $5,000.00</span>
+        </div>
+
+        <div class="record-frame">
+          <div class="record-top">
+            <span class="verdict-held">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+              HELD · no rebalance this cycle
+            </span>
+            <div class="record-meta">
+              <div class="meta-pair"><span class="label">version</span><span class="v">v2</span></div>
+              <div class="meta-pair"><span class="label">whales</span><span class="v">11</span></div>
+              <div class="meta-pair"><span class="label">proposals</span><span class="v">3 · all vetoed</span></div>
+              <button class="btn-raw" id="rawBtn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 4l-4 8 4 8M16 4l4 8-4 8"/></svg>
+                Raw JSON
+              </button>
+            </div>
+          </div>
+
+          <!-- 4-AGENT PIPELINE -->
+          <div class="pipeline">
+            <div class="pnode" tabindex="0" role="button" aria-label="Scorer agent detail">
+              <div class="pnode-head"><span class="pnode-idx">01</span><span class="pnode-name">Scorer</span></div>
+              <div class="pnode-io">Ranked <span class="mono">11</span> whales 0–100 on PnL, Sharpe, drawdown, recency. Top <span class="mono">0x4e14fc11</span> at <span class="mono">59.6</span>.</div>
+              <div class="pnode-conf"><span class="label">top score</span><span class="mono">59.63</span></div>
+              <span class="pnode-more"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>open</span>
+            </div>
+
+            <div class="pnode" tabindex="0" role="button" aria-label="Allocator agent detail">
+              <div class="pnode-head"><span class="pnode-idx">02</span><span class="pnode-name">Allocator</span></div>
+              <div class="pnode-io">Drafted <span class="mono">3</span> proposals: equal_weight, score_weighted, kelly_bounded. Each normalised to <span class="mono">$5,000</span>.</div>
+              <div class="pnode-conf"><span class="label">proposals</span><span class="mono">3</span></div>
+              <span class="pnode-more"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>open</span>
+            </div>
+
+            <div class="pnode veto" tabindex="0" role="button" aria-label="Risk agent detail">
+              <div class="pnode-head"><span class="pnode-idx">03</span><span class="pnode-name">Risk</span></div>
+              <div class="pnode-io">Vetoed <span class="mono">3/3</span>. Directional bias <span class="mono">100%</span> > 80% cap; concentration up to <span class="mono">98.2%</span> > 50% cap.</div>
+              <div class="pnode-conf"><span class="label">verdict</span><span class="mono veto-tag">3 vetoes</span></div>
+              <span class="pnode-more"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>open</span>
+            </div>
+
+            <div class="pnode final" tabindex="0" role="button" aria-label="Coordinator agent detail">
+              <div class="pnode-head"><span class="pnode-idx">04</span><span class="pnode-name">Coordinator</span></div>
+              <div class="pnode-io">No surviving proposal. Precedence kelly &gt; score &gt; equal yields nothing → <span class="mono">HOLD</span>. Capital stays parked.</div>
+              <div class="pnode-conf"><span class="label">action</span><span class="mono hold-tag">HELD</span></div>
+              <span class="pnode-more"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>open</span>
+            </div>
+          </div>
+
+          <!-- SCORES TABLE -->
+          <div class="sub">
+            <div class="sub-head"><span class="label">Scorer output · whales ranked by composite (0–100)</span></div>
+            <table class="scores">
+              <thead>
+                <tr>
+                  <th>Wallet</th>
+                  <th class="r">PnL (30d)</th>
+                  <th class="r">Open pos</th>
+                  <th>Note</th>
+                  <th class="r">Score</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="addr">0x4e14fc11…c0eab</span></td>
+                  <td class="r mono pos">+$7,402.70</td>
+                  <td class="r mono">1</td>
+                  <td><span class="flag">ETH long · active</span></td>
+                  <td class="r"><span class="scorebar"><span class="track"><span class="fill" style="width:59.6%"></span></span><span class="scoreval">59.63</span></span></td>
+                </tr>
+                <tr>
+                  <td><span class="addr">0xe44bd27c…29ea8</span></td>
+                  <td class="r mono num-dim">+$0.00</td>
+                  <td class="r mono">0</td>
+                  <td><span class="flag">sharpe 100</span></td>
+                  <td class="r"><span class="scorebar"><span class="track"><span class="fill" style="width:52%"></span></span><span class="scoreval">52.00</span></span></td>
+                </tr>
+                <tr>
+                  <td><span class="addr">0x90b38c57…b98a</span></td>
+                  <td class="r mono num-dim">+$0.00</td>
+                  <td class="r mono">0</td>
+                  <td><span class="flag">idle</span></td>
+                  <td class="r"><span class="scorebar"><span class="track"><span class="fill" style="width:48%"></span></span><span class="scoreval">48.00</span></span></td>
+                </tr>
+                <tr>
+                  <td><span class="addr">0x82e843a4…dca88</span> <span class="flag hype">$22.6M HYPE whale</span></td>
+                  <td class="r mono num-dim">+$0.00</td>
+                  <td class="r mono">1</td>
+                  <td><span class="flag">HYPE · active · high DD</span></td>
+                  <td class="r"><span class="scorebar"><span class="track"><span class="fill" style="width:32%"></span></span><span class="scoreval">32.00</span></span></td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="scores-foot">+ 7 more whales (scores 16.0–44.0) · all flat PnL, 0 open positions · <a href="#" style="color:var(--teal)">expand full table</a></div>
+          </div>
+
+          <!-- VETO LEDGER -->
+          <div class="veto-ledger">
+            <div class="sub-head" style="padding-top:0"><span class="label">Risk agent · all 3 proposals vetoed</span></div>
+            <div class="veto-row">
+              <span class="vp-name">equal_weight</span>
+              <div class="vp-reasons">
+                <span class="vp-reason"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg> directional bias <span class="mono">|L−S|/AUM = 100%</span> (cap 80%)</span>
+              </div>
+              <span class="vp-badge">VETO</span>
+            </div>
+            <div class="veto-row">
+              <span class="vp-name">score_weighted</span>
+              <div class="vp-reasons">
+                <span class="vp-reason"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg> concentration <span class="mono">max coin = 98.2%</span> (cap 50%)</span>
+                <span class="vp-reason"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg> directional bias <span class="mono">100%</span> (cap 80%)</span>
+              </div>
+              <span class="vp-badge">VETO</span>
+            </div>
+            <div class="veto-row">
+              <span class="vp-name">kelly_bounded</span>
+              <div class="vp-reasons">
+                <span class="vp-reason"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg> concentration <span class="mono">max coin = 60.0%</span> (cap 50%)</span>
+                <span class="vp-reason"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg> directional bias <span class="mono">100%</span> (cap 80%)</span>
+              </div>
+              <span class="vp-badge">VETO</span>
+            </div>
+            <div class="scores-foot" style="padding-top:var(--s2)">
+              <span style="font-family:var(--serif);font-style:italic;font-size:14px;color:var(--ink)">Coordinator: “All proposals vetoed by RiskAgent — no rebalance this cycle.”</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== CHAIN COMPARE ===================== -->
+      <section class="section" aria-label="Settlement cost and latency comparison">
+        <div class="sec-head">
+          <h2 class="sec-title">Why we anchor on Arc</h2>
+          <span class="sec-note">last settlement · tx 0xa8e89e38…d0ee · 1.13s</span>
+        </div>
+        <div class="compare">
+          <div class="crow head"><span>Chain</span><span>Settlement latency</span><span class="r">Time</span><span class="r">Cost</span></div>
+          <div class="crow">
+            <span class="cname win"><svg class="star" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.3 6.9.7-5.2 4.6 1.5 6.8L12 17.8 5.9 21.4l1.5-6.8L2.2 9.9l6.9-.7z"/></svg>Arc L1</span>
+            <span class="cbar-track"><span class="cbar win" style="width:9%"></span></span>
+            <span class="cval win">1.13s</span>
+            <span class="cval win">~$0.0005</span>
+          </div>
+          <div class="crow">
+            <span class="cname">Arbitrum</span>
+            <span class="cbar-track"><span class="cbar alt" style="width:46%"></span></span>
+            <span class="cval">~13s</span>
+            <span class="cval">~$0.04</span>
+          </div>
+          <div class="crow">
+            <span class="cname">Ethereum L1</span>
+            <span class="cbar-track"><span class="cbar alt" style="width:100%"></span></span>
+            <span class="cval">~3 min</span>
+            <span class="cval">~$2.10</span>
+          </div>
+        </div>
+        <div class="scores-foot" style="padding-top:var(--s4)">USDC is Arc's native gas token — no separate gas asset, no Paymaster needed. Latency/cost are representative; Arc figure is measured on testnet.</div>
+      </section>
+
+      <!-- ===================== ATTESTATION (empty) ===================== -->
+      <section class="section" aria-label="Bonded whale attestation">
+        <div class="sec-head">
+          <h2 class="sec-title">Bonded-whale attestation</h2>
+          <span class="sec-note">WhaleAttestation · 0x1d2d34D9…0F7f</span>
+        </div>
+        <div class="attest-empty">
+          <svg class="attest-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/></svg>
+          <p class="attest-claim">No whales have bonded yet. When a tracked whale stakes a bond, it appears here — and any deviation beyond threshold is slashable, on-chain.</p>
+          <div class="attest-stat">
+            <div><div class="v mono">0</div><div class="label">whales bonded</div></div>
+            <div><div class="v mono">$0.00</div><div class="label">total staked</div></div>
+            <div><div class="v mono">0</div><div class="label">slashes</div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== CONTRACTS ===================== -->
+      <section class="section" aria-label="Verified contracts">
+        <div class="sec-head">
+          <h2 class="sec-title">Verified contracts</h2>
+          <span class="sec-note">Arc testnet · deployed 2026-05-23 · click address to copy</span>
+        </div>
+        <div class="contracts">
+          <div class="crow2">
+            <span class="cn-name"><svg class="vchk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.2l2.3 2.3 4.7-4.9"/></svg>IndexToken</span>
+            <button class="copy-addr" data-addr="0xAdEa3FaE6011c2D275868d1c1933B37BE7648269">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/></svg>
+              0xAdEa3FaE…8269
+            </button>
+            <span></span>
+            <a class="arcscan" href="https://testnet.arcscan.app/address/0xAdEa3FaE6011c2D275868d1c1933B37BE7648269" target="_blank" rel="noopener">Arcscan <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
+          </div>
+          <div class="crow2">
+            <span class="cn-name"><svg class="vchk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.2l2.3 2.3 4.7-4.9"/></svg>RebalanceExecutor</span>
+            <button class="copy-addr" data-addr="0xb06a30226979789508306dAA9b027914045a4024">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/></svg>
+              0xb06a3022…4024
+            </button>
+            <span></span>
+            <a class="arcscan" href="https://testnet.arcscan.app/address/0xb06a30226979789508306dAA9b027914045a4024" target="_blank" rel="noopener">Arcscan <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
+          </div>
+          <div class="crow2">
+            <span class="cn-name"><svg class="vchk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.2l2.3 2.3 4.7-4.9"/></svg>NAVOracle</span>
+            <button class="copy-addr" data-addr="0xfEbB84BE47b0d440Ba08DaE0f5E3b09B4f989Cf8">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/></svg>
+              0xfEbB84BE…9Cf8
+            </button>
+            <span></span>
+            <a class="arcscan" href="https://testnet.arcscan.app/address/0xfEbB84BE47b0d440Ba08DaE0f5E3b09B4f989Cf8" target="_blank" rel="noopener">Arcscan <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
+          </div>
+          <div class="crow2">
+            <span class="cn-name"><svg class="vchk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.2l2.3 2.3 4.7-4.9"/></svg>WhaleAttestation</span>
+            <button class="copy-addr" data-addr="0x1d2d34D941b13CbF233051074F007ecf68fB0F7f">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/></svg>
+              0x1d2d34D9…0F7f
+            </button>
+            <span></span>
+            <a class="arcscan" href="https://testnet.arcscan.app/address/0x1d2d34D941b13CbF233051074F007ecf68fB0F7f" target="_blank" rel="noopener">Arcscan <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
+          </div>
+          <div class="crow2">
+            <span class="cn-name"><svg class="vchk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.2l2.3 2.3 4.7-4.9"/></svg>USDC <span style="color:var(--ink-dim);font-weight:400">native</span></span>
+            <button class="copy-addr" data-addr="0x3600000000000000000000000000000000000000">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/></svg>
+              0x36000000…0000
+            </button>
+            <span></span>
+            <a class="arcscan" href="https://testnet.arcscan.app/address/0x3600000000000000000000000000000000000000" target="_blank" rel="noopener">Arcscan <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
+          </div>
+          <div class="crow2">
+            <span class="cn-name"><svg class="vchk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.2l2.3 2.3 4.7-4.9"/></svg>TokenMessenger <span class="demo-pill">mock · CCTP gated</span></span>
+            <button class="copy-addr" data-addr="0x2522423855550e82016103c79F097042Cf2d5a0B">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/></svg>
+              0x25224238…5a0B
+            </button>
+            <span></span>
+            <a class="arcscan" href="https://testnet.arcscan.app/address/0x2522423855550e82016103c79F097042Cf2d5a0B" target="_blank" rel="noopener">Arcscan <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
+          </div>
+        </div>
+        <div class="scores-foot" style="padding-top:var(--s4)">Safety primitives live: NAVOracle.maxDeltaBps = 5000 · IndexToken Pausable · RebalanceExecutor Pausable. Real CCTP burn is mocked on Arc testnet (contract callers gated — V3 unblock via Circle allowlist).</div>
+      </section>
+
+    </div><!-- /container -->
+
+    <!-- ===================== FOOTER ===================== -->
+    <footer class="foot">
+      <p class="foot-cite">
+        <b>Inspiration:</b> Bloomberg terminal (functional density) + Etherscan (provenance &amp; verification UX). Hierarchy by weight and opacity, not size. Numbers in JetBrains Mono, tabular. One authority line in Crimson Pro.
+      </p>
+      <span class="foot-dna">DNA-G-S-M-D-X · The Ledger</span>
+    </footer>
+  </div>
+</div>
+
+<!-- ===================== BUYER PANEL ===================== -->
+<div class="scrim" id="scrim" tabindex="-1"></div>
+<aside class="panel" id="panel" role="dialog" aria-modal="true" aria-label="Buy or redeem WHALE shares">
+  <div class="panel-head">
+    <span class="panel-title">Trade WHALE</span>
+    <button class="panel-close" id="panelClose" aria-label="Close panel">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+  <div class="panel-body">
+    <div class="seg" role="tablist" aria-label="Buy or redeem">
+      <button class="active" id="segBuy" role="tab" aria-selected="true">Buy</button>
+      <button id="segRedeem" role="tab" aria-selected="false">Redeem</button>
+    </div>
+
+    <!-- FORM (idle/input) -->
+    <div id="buyForm">
+      <div class="field">
+        <label for="amt" id="amtLabel">You pay · USDC</label>
+        <div class="input-shell" id="amtShell">
+          <span class="cur" id="amtCur">$</span>
+          <input id="amt" inputmode="decimal" placeholder="0.00" aria-describedby="amtErr amtHelp" />
+        </div>
+        <div class="field-help" id="amtHelp">
+          <span>balance <span class="mono">2,500.00 USDC</span></span>
+          <span class="mono" id="maxBtn" role="button" tabindex="0">max</span>
+        </div>
+        <span class="field-err" id="amtErr">Amount exceeds your USDC balance.</span>
+      </div>
+
+      <div class="estimate" style="margin-top:var(--s4)">
+        <div class="est-row"><span class="label">share price</span><span class="v">$1.0000</span></div>
+        <div class="est-row big"><span class="label" id="estLabel">est. shares received</span><span class="v" id="estVal">0.0000 WHALE</span></div>
+        <div class="est-row"><span class="label">network fee · USDC gas</span><span class="v num-dim">~$0.0005</span></div>
+      </div>
+
+      <button class="btn-action" id="actionBtn" style="margin-top:var(--s5)" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        <span id="actionLabel">Enter an amount</span>
+      </button>
+    </div>
+
+    <!-- SETTLING -->
+    <div class="settle" id="settle">
+      <svg class="settle-ring" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></svg>
+      <div class="ms mono" id="msCounter">0 ms</div>
+      <div class="lbl">settling on Arc — sub-second finality</div>
+    </div>
+
+    <!-- SUCCESS -->
+    <div class="success" id="success">
+      <div class="success-head">
+        <svg class="success-chk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M8 12.4l2.6 2.6L16 9.4"/></svg>
+        <div>
+          <div class="t" id="successTitle">Settled in 1.08s</div>
+          <div class="s" id="successSub">2,500.00 USDC → 2,500.0000 WHALE</div>
+        </div>
+      </div>
+      <a class="success-tx" href="https://testnet.arcscan.app" target="_blank" rel="noopener">
+        view tx 0x959e0abb…6816
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 17L17 7M9 7h8v8"/></svg>
+      </a>
+      <button class="btn-action" id="doneBtn" style="margin-top:var(--s2)">Done</button>
+    </div>
+
+    <p class="panel-note">
+      Settlement is denominated in native USDC on Arc. Buy/redeem are Pausable for emergencies. No native token is ever surfaced — gas is paid in USDC. Amounts validate on blur, not per keystroke.
+    </p>
+  </div>
+</aside>
+
+<!-- COPY TOAST -->
+<div class="toast" id="toast" role="status" aria-live="polite">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.5l4 4 10-10"/></svg>
+  <span id="toastTxt">Copied</span>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var SHARE_PRICE = 1.0000;
+  var USDC_BAL = 2500.00;
+  var WHALE_BAL = 0.0000;
+
+  /* ---------- copy-to-clipboard on addresses ---------- */
+  var toast = document.getElementById('toast');
+  var toastTxt = document.getElementById('toastTxt');
+  var toastTimer;
+  function showToast(msg) {
+    toastTxt.textContent = msg;
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ toast.classList.remove('show'); }, 1600);
+  }
+  document.querySelectorAll('.copy-addr').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var addr = btn.getAttribute('data-addr');
+      var done = function () {
+        btn.classList.add('copied');
+        showToast('Copied ' + addr.slice(0, 10) + '…');
+        setTimeout(function(){ btn.classList.remove('copied'); }, 1200);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(addr).then(done, done);
+      } else { done(); }
+    });
+  });
+
+  /* ---------- buyer panel open/close ---------- */
+  var scrim = document.getElementById('scrim');
+  var panel = document.getElementById('panel');
+  var connectBtn = document.getElementById('connectBtn');
+  var panelClose = document.getElementById('panelClose');
+  var lastFocus = null;
+  function openPanel() {
+    lastFocus = document.activeElement;
+    scrim.classList.add('open'); panel.classList.add('open');
+    setTimeout(function(){ document.getElementById('amt').focus(); }, 210);
+  }
+  function closePanel() {
+    scrim.classList.remove('open'); panel.classList.remove('open');
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+  connectBtn.addEventListener('click', openPanel);
+  panelClose.addEventListener('click', closePanel);
+  scrim.addEventListener('click', closePanel);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && panel.classList.contains('open')) closePanel();
+  });
+
+  /* ---------- segmented buy/redeem ---------- */
+  var segBuy = document.getElementById('segBuy');
+  var segRedeem = document.getElementById('segRedeem');
+  var mode = 'buy';
+  var amtLabel = document.getElementById('amtLabel');
+  var amtCur = document.getElementById('amtCur');
+  var estLabel = document.getElementById('estLabel');
+  var amtHelp = document.getElementById('amtHelp');
+  function setMode(m) {
+    mode = m;
+    var buy = m === 'buy';
+    segBuy.classList.toggle('active', buy);
+    segRedeem.classList.toggle('active', !buy);
+    segBuy.setAttribute('aria-selected', buy);
+    segRedeem.setAttribute('aria-selected', !buy);
+    amtLabel.textContent = buy ? 'You pay · USDC' : 'You redeem · WHALE';
+    amtCur.textContent = buy ? '$' : '◈';
+    estLabel.textContent = buy ? 'est. shares received' : 'est. USDC returned';
+    amtHelp.querySelector('.mono').textContent = buy
+      ? '2,500.00 USDC' : '0.0000 WHALE';
+    validate();
+  }
+  segBuy.addEventListener('click', function(){ setMode('buy'); });
+  segRedeem.addEventListener('click', function(){ setMode('redeem'); });
+
+  /* ---------- amount validation (on blur) + live estimate ---------- */
+  var amt = document.getElementById('amt');
+  var amtShell = document.getElementById('amtShell');
+  var amtErr = document.getElementById('amtErr');
+  var estVal = document.getElementById('estVal');
+  var actionBtn = document.getElementById('actionBtn');
+  var actionLabel = document.getElementById('actionLabel');
+  var maxBtn = document.getElementById('maxBtn');
+
+  function fmt(n, dp) { return n.toLocaleString('en-US', {minimumFractionDigits: dp, maximumFractionDigits: dp}); }
+
+  function recalcEstimate() {
+    var v = parseFloat(amt.value);
+    if (isNaN(v) || v <= 0) { estVal.textContent = (mode === 'buy' ? '0.0000 WHALE' : '$0.0000'); return; }
+    if (mode === 'buy') estVal.textContent = fmt(v / SHARE_PRICE, 4) + ' WHALE';
+    else estVal.textContent = '$' + fmt(v * SHARE_PRICE, 4);
+  }
+  function validate() {
+    var v = parseFloat(amt.value);
+    var bal = mode === 'buy' ? USDC_BAL : WHALE_BAL;
+    var ok = !isNaN(v) && v > 0 && v <= bal;
+    recalcEstimate();
+    if (!amt.value) {
+      actionBtn.disabled = true; actionLabel.textContent = 'Enter an amount';
+      amtShell.classList.remove('invalid'); amtErr.classList.remove('show');
+      return;
+    }
+    if (ok) {
+      actionBtn.disabled = false;
+      actionLabel.textContent = (mode === 'buy' ? 'Buy WHALE' : 'Redeem WHALE');
+      amtShell.classList.remove('invalid'); amtErr.classList.remove('show');
+    } else {
+      actionBtn.disabled = true;
+      actionLabel.textContent = (mode === 'buy' ? 'Buy WHALE' : 'Redeem WHALE');
+      amtShell.classList.add('invalid');
+      amtErr.textContent = (isNaN(v) || v <= 0)
+        ? 'Enter an amount greater than zero.'
+        : 'Amount exceeds your ' + (mode === 'buy' ? 'USDC' : 'WHALE') + ' balance.';
+      amtErr.classList.add('show');
+    }
+  }
+  amt.addEventListener('input', function () {
+    // live estimate only; defer hard validation to blur (Stripe pattern)
+    recalcEstimate();
+    if (!amt.value) { actionBtn.disabled = true; actionLabel.textContent = 'Enter an amount'; }
+    else { actionBtn.disabled = false; actionLabel.textContent = (mode === 'buy' ? 'Buy WHALE' : 'Redeem WHALE'); }
+  });
+  amt.addEventListener('blur', validate);
+  maxBtn.addEventListener('click', function () {
+    amt.value = (mode === 'buy' ? USDC_BAL.toFixed(2) : WHALE_BAL.toFixed(4));
+    validate();
+  });
+  maxBtn.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); maxBtn.click(); } });
+
+  /* ---------- confirm → settling(ms counter) → success ---------- */
+  var buyForm = document.getElementById('buyForm');
+  var settle = document.getElementById('settle');
+  var success = document.getElementById('success');
+  var msCounter = document.getElementById('msCounter');
+  var successTitle = document.getElementById('successTitle');
+  var successSub = document.getElementById('successSub');
+  var doneBtn = document.getElementById('doneBtn');
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  actionBtn.addEventListener('click', function () {
+    if (actionBtn.disabled) return;
+    var v = parseFloat(amt.value);
+    buyForm.style.display = 'none';
+    settle.classList.add('show');
+    var FINAL = 1080; // measured Arc settlement, ms
+    if (reduceMotion) {
+      msCounter.textContent = FINAL + ' ms';
+      finish(v, FINAL);
+      return;
+    }
+    var start = performance.now();
+    function tick(now) {
+      var el = Math.min(now - start, FINAL);
+      msCounter.textContent = Math.round(el) + ' ms';
+      if (el < FINAL) requestAnimationFrame(tick);
+      else finish(v, FINAL);
+    }
+    requestAnimationFrame(tick);
+  });
+
+  function finish(v, ms) {
+    settle.classList.remove('show');
+    success.classList.add('show');
+    successTitle.textContent = 'Settled in ' + (ms / 1000).toFixed(2) + 's';
+    if (mode === 'buy') successSub.textContent = fmt(v, 2) + ' USDC → ' + fmt(v / SHARE_PRICE, 4) + ' WHALE';
+    else successSub.textContent = fmt(v, 4) + ' WHALE → $' + fmt(v * SHARE_PRICE, 4);
+  }
+  doneBtn.addEventListener('click', function () {
+    success.classList.remove('show');
+    buyForm.style.display = 'block';
+    amt.value = ''; validate();
+    closePanel();
+  });
+
+  /* ---------- raw JSON button (no-op affordance demo) ---------- */
+  document.getElementById('rawBtn').addEventListener('click', function () {
+    showToast('Raw decision JSON · cid 328536b0…a87fcf');
+  });
+
+  /* ---------- refresh button: brief skeleton flash to demo per-widget load ---------- */
+  var navLive = document.getElementById('navLive');
+  var navSkel = document.getElementById('navSkel');
+  document.getElementById('refreshBtn').addEventListener('click', function () {
+    if (reduceMotion) { showToast('Refreshed'); return; }
+    navLive.classList.add('hide'); navSkel.classList.add('show');
+    setTimeout(function () {
+      navSkel.classList.remove('show'); navLive.classList.remove('hide');
+      showToast('NAV refreshed');
+    }, 650);
+  });
+
+  /* ---------- pipeline node → toast (stands in for slide-in detail) ---------- */
+  document.querySelectorAll('.pnode').forEach(function (node) {
+    node.addEventListener('click', function () {
+      showToast(node.querySelector('.pnode-name').textContent + ' · agent reasoning');
+    });
+    node.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); node.click(); }
+    });
+  });
+
+  setMode('buy');
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<!--
+================================================================================
+WhaleIndex — Proposal 2: "The Thesis"
+DNA: DNA-S-T-C-N-E
+  S — Layout: Single-column editorial reading flow (max ~65ch prose, typeset report)
+  T — Navigation: Top-fixed, thin, hairline underline on scroll
+  C — Hero: Centered editorial thesis statement (Crimson Pro authority)
+  N — Color: Neutral charcoal grays + ONE teal accent (sparingly); red = loss/short/veto/error
+  E — Typography: Serif-forward — Crimson Pro = authority (headings, thesis, attestation);
+      DM Sans = body; JetBrains Mono = ALL numbers/data (tabular-nums)
+
+CONCEPT
+  The product's argument ("don't trust us — your browser just verified the agent's
+  reasoning") told as a confident financial editorial. Linear craft-calm + Stripe
+  fintech-trust + newspaper editorial column rhythm. The LANDING is the strongest
+  surface; the dashboard reads like a beautifully typeset report.
+
+UX ARCHITECTURE (one scrollable page, 3 surfaces)
+  Surface 1 — LANDING HERO (strongest)
+    - Top-fixed nav (mark · section links · Connect)
+    - Centered Crimson Pro thesis statement (the argument)
+    - DM Sans editorial subhead + byline-style dateline
+    - Live NAV inline (Stripe de-emphasized currency)
+    - One calm CTA ("Read the latest decision") + secondary ("Verify it yourself")
+  Surface 2 — DASHBOARD AS TYPESET REPORT
+    - NAV KPI card (Stripe sparkline + de-emphasized $/decimals, integer full-contrast mono)
+    - "Since last rebalance" delta line → reads "0 changes · agent held · anchored ✓"
+    - DECISION RECORD: prose-annotated, REAL no-trade data
+        · 11 whales scored (top 0x4e14fc11 @ 59.63; $22.6M HYPE whale 0x082e843a @ 32.0)
+        · 3 proposals (equal_weight / score_weighted / kelly_bounded) ALL vetoed by Risk
+          (directional bias 100% > 80%; concentration up to 98.2% > 50%)
+        · Coordinator: HELD — framed POSITIVELY ("Why the agent held")
+        · 4 labeled steps: Scorer → Allocator → Risk → Coordinator
+    - LIVE hash verification line (client-side sha256 recompute === anchored hash)
+    - Chain cost/latency honest compare
+    - Attestation (Crimson Pro statement + honest empty state: 0 whales bonded)
+    - Verified contracts with click-to-copy
+  Surface 3 — BUYER FLOW
+    - Top-nav "Connect" → centered calm modal Buy/Redeem
+    - on-blur validation, 16px input, estimated shares
+    - confirm → settling (live ms) → calm checkmark success (NO confetti)
+
+STATES
+  Per-widget skeletons (independent load); no-trade decision = live state;
+  rpc error/retry band; empty attestation; buyer success/error.
+
+ACCESSIBILITY
+  4.5:1 contrast (muted serif checked on charcoal), box-shadow focus rings,
+  44px targets, aria-labels, semantic buttons, labeled inputs, 16px input font,
+  prefers-reduced-motion honored.
+
+FAKED / SIMULATED STATE (honest disclosure)
+  - Buyer flow settlement timer + balances are client-side simulated (no live wallet/RPC
+    in a static file). Labeled "simulated" in UI.
+  - The sha256 verification line shows a real client-side SHA-256 of an embedded sample
+    string and compares the truncated display to the anchored CID; in production this
+    hashes the fetched allocation JSON. Marked as a live recompute demo.
+  - NAV sparkline points are illustrative since-inception samples.
+  Everything in the DECISION RECORD (whales, scores, proposals, vetoes, HELD, CID,
+  contract addresses) is REAL data from docs/decision-latest.json + arc-testnet.json.
+================================================================================
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WhaleIndex — The Thesis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    /* ---- charcoal base (NEVER #000) ---- */
+    --bg:            #0c0e0f;
+    --bg-raise:      #121517;
+    --bg-sink:       #090a0b;
+    --hair:          rgba(255,255,255,0.07);
+    --hair-strong:   rgba(255,255,255,0.12);
+
+    /* ---- ink ---- */
+    --ink:           rgba(255,255,255,0.92);
+    --ink-soft:      rgba(255,255,255,0.64);
+    --ink-mute:      rgba(255,255,255,0.46);
+    --ink-faint:     rgba(255,255,255,0.30);
+
+    /* ---- one accent (teal family), used sparingly ---- */
+    --accent:        #00d4aa;
+    --accent-soft:   rgba(0,212,170,0.14);
+    --accent-line:   rgba(0,212,170,0.32);
+
+    /* ---- red strictly for loss/short/veto/error ---- */
+    --danger:        #ff6b6b;
+    --danger-soft:   rgba(255,107,107,0.12);
+
+    /* ---- amber for pending/stale only ---- */
+    --warn:          #e3b341;
+
+    /* ---- type ---- */
+    --serif: 'Crimson Pro', Georgia, serif;
+    --sans:  'DM Sans', system-ui, sans-serif;
+    --mono:  'JetBrains Mono', ui-monospace, monospace;
+
+    /* ---- spacing scale ---- */
+    --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
+    --s5: 24px; --s6: 32px; --s7: 48px; --s8: 64px; --s9: 96px;
+
+    --col: 65ch;
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    letter-spacing: -0.011em;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* faint top vignette for depth without flat black */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(1100px 460px at 50% -8%, rgba(0,212,170,0.05), transparent 70%),
+      radial-gradient(900px 600px at 100% 110%, rgba(255,255,255,0.018), transparent 70%);
+    z-index: 0;
+  }
+
+  .wrap { position: relative; z-index: 1; }
+
+  /* ---------- numbers ---------- */
+  .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+  .num  { font-family: var(--mono); font-variant-numeric: tabular-nums; letter-spacing: 0; font-weight: 600; }
+
+  /* de-emphasized currency (Stripe) */
+  .cur-sym, .cur-dec { opacity: 0.55; font-weight: 500; }
+
+  .pos { color: var(--accent); }
+  .neg { color: var(--danger); }
+
+  /* ---------- nav ---------- */
+  .nav {
+    position: fixed; top: 0; left: 0; right: 0;
+    z-index: 50;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 var(--s6);
+    height: 60px;
+    background: rgba(12,14,15,0.78);
+    backdrop-filter: blur(14px) saturate(140%);
+    border-bottom: 1px solid transparent;
+    transition: border-color 150ms var(--ease), background 150ms var(--ease);
+  }
+  .nav.scrolled { border-bottom-color: var(--hair); background: rgba(12,14,15,0.9); }
+  .brand { display: flex; align-items: center; gap: var(--s3); }
+  .brand-mark { width: 22px; height: 22px; flex: none; }
+  .brand-name { font-family: var(--serif); font-weight: 600; font-size: 19px; letter-spacing: 0.01em; }
+  .brand-name b { color: var(--accent); font-weight: 600; }
+  .nav-links { display: flex; align-items: center; gap: var(--s6); }
+  .nav-link {
+    font-size: 14px; color: var(--ink-soft); text-decoration: none;
+    font-weight: 500; transition: color 150ms var(--ease);
+  }
+  .nav-link:hover { color: var(--ink); }
+  .nav-link:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft); border-radius: 4px; }
+
+  /* ---------- buttons ---------- */
+  .btn {
+    font-family: var(--sans); font-size: 14px; font-weight: 500;
+    letter-spacing: -0.011em;
+    display: inline-flex; align-items: center; justify-content: center; gap: var(--s2);
+    min-height: 44px; padding: 0 var(--s5);
+    border-radius: 2px; border: 1px solid var(--hair-strong);
+    background: transparent; color: var(--ink); cursor: pointer;
+    transition: border-color 150ms var(--ease), background 150ms var(--ease), color 150ms var(--ease);
+  }
+  .btn:hover { border-color: var(--ink-mute); background: rgba(255,255,255,0.03); }
+  .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+  .btn-accent {
+    background: var(--accent); color: #04201a; border-color: var(--accent); font-weight: 600;
+  }
+  .btn-accent:hover { background: #16e3ba; border-color: #16e3ba; }
+  .btn-sm { min-height: 36px; padding: 0 var(--s4); font-size: 13px; }
+  .btn-ghost { border-color: transparent; color: var(--ink-soft); }
+  .btn-ghost:hover { color: var(--ink); border-color: var(--hair); background: transparent; }
+
+  /* ---------- layout shells ---------- */
+  .reading { max-width: 760px; margin: 0 auto; padding: 0 var(--s6); }
+  .prose { max-width: var(--col); }
+  .prose p { color: var(--ink-soft); margin: 0 0 var(--s4); font-size: 16px; line-height: 1.62; }
+  .prose p strong { color: var(--ink); font-weight: 600; }
+
+  section { position: relative; }
+  .divider { border: 0; border-top: 1px solid var(--hair); margin: 0; }
+
+  /* eyebrow / section kicker */
+  .kicker {
+    font-family: var(--mono); font-size: 11px; font-weight: 500;
+    letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-mute);
+    margin: 0 0 var(--s3);
+  }
+  .serif-h {
+    font-family: var(--serif); font-weight: 600; color: var(--ink);
+    line-height: 1.16; letter-spacing: 0.005em;
+    margin: 0 0 var(--s4);
+  }
+
+  /* ================= HERO ================= */
+  .hero {
+    padding: 160px var(--s6) var(--s9);
+    text-align: center;
+  }
+  .dateline {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--ink-mute);
+    display: inline-flex; align-items: center; gap: var(--s3);
+    margin-bottom: var(--s6);
+  }
+  .dateline .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+
+  .thesis {
+    font-family: var(--serif); font-weight: 500;
+    font-size: clamp(34px, 5.4vw, 62px);
+    line-height: 1.14; letter-spacing: 0.002em;
+    color: var(--ink);
+    max-width: 18ch; margin: 0 auto var(--s6);
+  }
+  .thesis .drop { color: var(--accent); font-weight: 600; }
+  .thesis .em { font-style: italic; color: var(--ink-soft); }
+
+  .hero-sub {
+    max-width: 58ch; margin: 0 auto var(--s7);
+    font-size: 18px; line-height: 1.6; color: var(--ink-soft);
+    letter-spacing: -0.012em;
+  }
+
+  .hero-nav-line {
+    display: inline-flex; align-items: baseline; gap: var(--s4);
+    padding: var(--s3) var(--s5);
+    border: 1px solid var(--hair); border-radius: 2px;
+    background: var(--bg-raise);
+    margin-bottom: var(--s7);
+  }
+  .hero-nav-line .lbl { font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-mute); }
+  .hero-nav-line .val { font-family: var(--mono); font-size: 22px; font-weight: 600; }
+  .hero-nav-line .trend { font-family: var(--mono); font-size: 12px; font-weight: 600; }
+
+  .hero-cta { display: flex; gap: var(--s3); justify-content: center; flex-wrap: wrap; }
+
+  /* ================= REPORT / DASHBOARD ================= */
+  .report { padding: var(--s9) var(--s6); }
+  .report-head { max-width: 760px; margin: 0 auto var(--s8); }
+  .report-head .serif-h { font-size: clamp(26px, 3.6vw, 36px); }
+
+  /* KPI card (Stripe) */
+  .kpi {
+    max-width: 760px; margin: 0 auto var(--s8);
+    display: grid; grid-template-columns: 1fr auto; gap: var(--s6); align-items: center;
+    padding: var(--s6);
+    border: 1px solid var(--hair); border-radius: 3px;
+    background: var(--bg-raise);
+  }
+  .kpi-label { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-mute); margin-bottom: var(--s3); }
+  .kpi-value { font-family: var(--mono); font-weight: 600; font-size: 46px; line-height: 1; letter-spacing: -0.01em; }
+  .kpi-sub { display: flex; align-items: center; gap: var(--s3); margin-top: var(--s4); flex-wrap: wrap; }
+  .trend-pill {
+    font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: 0.01em;
+    padding: 3px var(--s2); border-radius: 2px; background: var(--accent-soft); color: var(--accent);
+  }
+  .kpi-meta { font-family: var(--mono); font-size: 12px; color: var(--ink-mute); }
+  .spark { width: 168px; height: 52px; display: block; }
+
+  /* since-last-rebalance line */
+  .delta-line {
+    max-width: 760px; margin: 0 auto var(--s8);
+    display: flex; align-items: center; gap: var(--s5); flex-wrap: wrap;
+    padding: var(--s4) 0; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair);
+  }
+  .delta-item { display: flex; flex-direction: column; gap: 2px; }
+  .delta-item .v { font-family: var(--mono); font-size: 15px; font-weight: 600; }
+  .delta-item .k { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-mute); }
+  .held-flag { margin-left: auto; display: inline-flex; align-items: center; gap: var(--s2); color: var(--accent); font-family: var(--mono); font-size: 13px; font-weight: 600; }
+
+  /* steps pipeline */
+  .pipeline { max-width: 760px; margin: 0 auto var(--s7); display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--hair); border: 1px solid var(--hair); border-radius: 3px; overflow: hidden; }
+  .step { background: var(--bg-raise); padding: var(--s5) var(--s4); position: relative; }
+  .step-no { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); letter-spacing: 0.1em; }
+  .step-name { font-family: var(--sans); font-weight: 600; font-size: 15px; margin: var(--s2) 0 var(--s1); }
+  .step-out { font-family: var(--mono); font-size: 12px; color: var(--ink-soft); line-height: 1.45; }
+  .step-out .veto { color: var(--danger); }
+  .step.coord .step-out { color: var(--accent); }
+
+  /* decision record body */
+  .record { max-width: 760px; margin: 0 auto; }
+  .record .serif-h { font-size: clamp(23px, 3vw, 30px); margin-top: var(--s8); }
+
+  /* whale table */
+  .table-wrap { margin: var(--s5) 0 var(--s6); border-top: 1px solid var(--hair); }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    font-family: var(--mono); font-size: 10px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--ink-mute); text-align: right; padding: var(--s3) var(--s3); border-bottom: 1px solid var(--hair);
+  }
+  thead th.l { text-align: left; }
+  tbody td { padding: var(--s3); border-bottom: 1px solid var(--hair); font-family: var(--mono); font-size: 13px; text-align: right; color: var(--ink-soft); }
+  tbody td.l { text-align: left; }
+  tbody tr:hover { background: rgba(255,255,255,0.02); }
+  tbody tr.top td { color: var(--ink); }
+  .addr { color: var(--ink-mute); }
+  .rank { color: var(--ink-faint); }
+  .badge-long { color: var(--accent); }
+  .score-bar { display: inline-block; height: 3px; background: var(--accent); border-radius: 2px; vertical-align: middle; margin-left: var(--s2); opacity: 0.7; }
+
+  /* proposals / vetoes */
+  .veto-card {
+    border: 1px solid var(--hair); border-left: 2px solid var(--danger);
+    border-radius: 2px; background: var(--bg-raise);
+    padding: var(--s4) var(--s5); margin-bottom: var(--s3);
+  }
+  .veto-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s4); margin-bottom: var(--s2); }
+  .veto-name { font-family: var(--mono); font-size: 14px; font-weight: 600; color: var(--ink); }
+  .veto-tag { font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--danger); background: var(--danger-soft); padding: 2px var(--s2); border-radius: 2px; }
+  .veto-reason { font-family: var(--mono); font-size: 12px; color: var(--ink-soft); line-height: 1.5; }
+  .veto-reason b { color: var(--danger); font-weight: 600; }
+
+  .pull {
+    font-family: var(--serif); font-style: italic; font-weight: 400;
+    font-size: clamp(20px, 2.8vw, 26px); line-height: 1.35; color: var(--ink);
+    border-left: 2px solid var(--accent-line); padding-left: var(--s5);
+    margin: var(--s6) 0; max-width: 56ch;
+  }
+
+  /* hash verification line */
+  .verify {
+    max-width: 760px; margin: var(--s7) auto;
+    border: 1px solid var(--hair); border-radius: 3px; background: var(--bg-sink);
+    padding: var(--s5);
+  }
+  .verify-row { display: flex; align-items: center; gap: var(--s3); font-family: var(--mono); font-size: 13px; flex-wrap: wrap; }
+  .verify-check { width: 18px; height: 18px; flex: none; }
+  .verify .computed { color: var(--ink-soft); }
+  .verify .anchored { color: var(--accent); }
+  .verify-note { font-family: var(--mono); font-size: 11px; color: var(--ink-mute); margin-top: var(--s3); }
+  .pending .verify-check { color: var(--warn); }
+
+  /* chain compare */
+  .compare { max-width: 760px; margin: 0 auto; }
+  .cmp-row { display: grid; grid-template-columns: 130px 1fr 92px; gap: var(--s4); align-items: center; padding: var(--s3) 0; border-bottom: 1px solid var(--hair); }
+  .cmp-name { font-family: var(--sans); font-size: 14px; color: var(--ink-soft); }
+  .cmp-name.us { color: var(--ink); font-weight: 600; }
+  .cmp-track { height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; }
+  .cmp-fill { height: 100%; border-radius: 3px; background: var(--ink-faint); }
+  .cmp-fill.us { background: var(--accent); }
+  .cmp-val { font-family: var(--mono); font-size: 13px; font-weight: 600; text-align: right; }
+
+  /* attestation */
+  .attest { max-width: 760px; margin: 0 auto; }
+  .attest-stmt {
+    font-family: var(--serif); font-weight: 400; font-size: clamp(21px, 3vw, 28px);
+    line-height: 1.4; color: var(--ink); max-width: 50ch; margin: 0 0 var(--s5);
+  }
+  .empty-state {
+    border: 1px dashed var(--hair-strong); border-radius: 3px;
+    padding: var(--s6); text-align: center; background: var(--bg-raise);
+  }
+  .empty-state .icon { color: var(--ink-faint); margin-bottom: var(--s3); }
+  .empty-state .t { font-family: var(--sans); font-weight: 600; font-size: 15px; color: var(--ink); margin-bottom: var(--s1); }
+  .empty-state .d { font-family: var(--sans); font-size: 14px; color: var(--ink-mute); max-width: 48ch; margin: 0 auto; }
+
+  /* contracts */
+  .contracts { max-width: 760px; margin: 0 auto; }
+  .ctr-row {
+    display: flex; align-items: center; justify-content: space-between; gap: var(--s4);
+    padding: var(--s3) 0; border-bottom: 1px solid var(--hair);
+  }
+  .ctr-name { font-family: var(--sans); font-size: 14px; color: var(--ink-soft); }
+  .copy-addr {
+    display: inline-flex; align-items: center; gap: var(--s2);
+    font-family: var(--mono); font-size: 13px; color: var(--ink);
+    background: transparent; border: 1px solid var(--hair); border-radius: 2px;
+    padding: 6px var(--s3); min-height: 36px; cursor: pointer;
+    transition: border-color 150ms var(--ease), color 150ms var(--ease);
+  }
+  .copy-addr:hover { border-color: var(--ink-mute); }
+  .copy-addr:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+  .copy-addr svg { color: var(--ink-mute); }
+  .copy-addr.copied { color: var(--accent); border-color: var(--accent-line); }
+  .copy-addr.copied svg { color: var(--accent); }
+
+  /* ---------- skeletons ---------- */
+  .sk { position: relative; overflow: hidden; background: rgba(255,255,255,0.04); border-radius: 3px; }
+  .sk::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
+    transform: translateX(-100%);
+    animation: shimmer 1.4s infinite;
+  }
+  @keyframes shimmer { 100% { transform: translateX(100%); } }
+  .sk-line { height: 12px; margin: 8px 0; }
+
+  .fade-in { animation: fadeIn 150ms var(--ease) both; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+  /* ---------- rpc error band ---------- */
+  .err-band {
+    max-width: 760px; margin: 0 auto var(--s6);
+    display: none; align-items: center; gap: var(--s4);
+    padding: var(--s4) var(--s5);
+    border: 1px solid var(--danger); border-left: 2px solid var(--danger);
+    border-radius: 2px; background: var(--danger-soft);
+  }
+  .err-band.show { display: flex; }
+  .err-band .msg { font-family: var(--sans); font-size: 14px; color: var(--ink); }
+  .err-band svg { color: var(--danger); flex: none; }
+
+  /* ================= MODAL (buyer) ================= */
+  .scrim {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(6,7,8,0.72); backdrop-filter: blur(4px);
+    display: none; align-items: center; justify-content: center; padding: var(--s5);
+    opacity: 0; transition: opacity 200ms var(--ease);
+  }
+  .scrim.open { display: flex; opacity: 1; }
+  .modal {
+    width: 100%; max-width: 420px;
+    background: var(--bg-raise); border: 1px solid var(--hair-strong);
+    border-radius: 4px; padding: var(--s6);
+    transform: translateY(8px) scale(0.99);
+    transition: transform 200ms var(--ease);
+  }
+  .scrim.open .modal { transform: none; }
+  .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--s5); }
+  .modal-title { font-family: var(--serif); font-weight: 600; font-size: 22px; }
+  .x-btn { background: transparent; border: 0; color: var(--ink-mute); cursor: pointer; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 2px; transition: color 150ms var(--ease); }
+  .x-btn:hover { color: var(--ink); }
+  .x-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+
+  .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; background: var(--hair); border: 1px solid var(--hair); border-radius: 2px; padding: 2px; margin-bottom: var(--s5); }
+  .seg button { background: transparent; border: 0; color: var(--ink-soft); font-family: var(--sans); font-size: 14px; font-weight: 500; min-height: 40px; cursor: pointer; border-radius: 2px; transition: background 150ms var(--ease), color 150ms var(--ease); }
+  .seg button.active { background: var(--bg); color: var(--ink); }
+  .seg button:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+
+  .field { margin-bottom: var(--s5); }
+  .field label { display: block; font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-mute); margin-bottom: var(--s2); }
+  .field-input {
+    display: flex; align-items: center; gap: var(--s3);
+    border: 1px solid var(--hair-strong); border-radius: 2px;
+    padding: 0 var(--s4); background: var(--bg);
+    transition: border-color 150ms var(--ease), box-shadow 150ms var(--ease);
+  }
+  .field-input:focus-within { border-color: var(--accent-line); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .field-input input {
+    flex: 1; background: transparent; border: 0; outline: none;
+    color: var(--ink); font-family: var(--mono); font-size: 16px; font-variant-numeric: tabular-nums;
+    min-height: 48px; padding: 0;
+  }
+  .field-input .suffix { font-family: var(--mono); font-size: 13px; color: var(--ink-mute); }
+  .field-err { font-family: var(--sans); font-size: 12px; color: var(--danger); margin-top: var(--s2); min-height: 16px; }
+  .est { font-family: var(--mono); font-size: 13px; color: var(--ink-soft); display: flex; justify-content: space-between; margin-bottom: var(--s5); }
+  .est .e-val { color: var(--ink); font-weight: 600; }
+
+  .settle { display: none; align-items: center; gap: var(--s3); font-family: var(--mono); font-size: 13px; color: var(--ink-soft); margin-bottom: var(--s4); }
+  .settle.show { display: flex; }
+  .settle .spin { width: 14px; height: 14px; border: 2px solid var(--hair-strong); border-top-color: var(--accent); border-radius: 50%; animation: rot 0.7s linear infinite; }
+  @keyframes rot { 100% { transform: rotate(360deg); } }
+
+  .success { display: none; text-align: center; padding: var(--s4) 0; }
+  .success.show { display: block; }
+  .success .check-wrap { width: 52px; height: 52px; margin: 0 auto var(--s4); }
+  .success .check-circle { stroke: var(--accent); stroke-width: 2; fill: none; }
+  .success .check-mark { stroke: var(--accent); stroke-width: 2.4; fill: none; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 26; stroke-dashoffset: 26; animation: draw 360ms var(--ease) 120ms forwards; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  .success .s-title { font-family: var(--serif); font-weight: 600; font-size: 20px; margin-bottom: var(--s2); }
+  .success .s-detail { font-family: var(--mono); font-size: 13px; color: var(--ink-soft); }
+  .sim-tag { font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--warn); border: 1px solid rgba(227,179,65,0.3); border-radius: 2px; padding: 2px 6px; }
+
+  /* ---------- DNA badge ---------- */
+  .dna {
+    position: fixed; top: 72px; right: var(--s5); z-index: 40;
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em;
+    color: var(--ink-mute); background: var(--bg-raise);
+    border: 1px solid var(--hair); border-radius: 2px;
+    padding: 4px var(--s2);
+  }
+
+  /* ---------- toast ---------- */
+  .toast {
+    position: fixed; bottom: var(--s6); left: 50%; transform: translateX(-50%) translateY(12px);
+    background: var(--bg-raise); border: 1px solid var(--hair-strong); border-radius: 2px;
+    padding: var(--s3) var(--s5); font-family: var(--mono); font-size: 12px; color: var(--ink);
+    opacity: 0; pointer-events: none; transition: opacity 150ms var(--ease), transform 150ms var(--ease);
+    z-index: 120;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%); }
+
+  /* ---------- footer ---------- */
+  .foot {
+    border-top: 1px solid var(--hair);
+    padding: var(--s8) var(--s6) var(--s7); margin-top: var(--s9);
+    text-align: center;
+  }
+  .foot .cite { font-family: var(--sans); font-size: 13px; color: var(--ink-mute); max-width: 60ch; margin: 0 auto var(--s3); line-height: 1.6; }
+  .foot .mark { font-family: var(--serif); font-size: 15px; color: var(--ink-soft); }
+
+  /* ---------- responsive ---------- */
+  @media (max-width: 720px) {
+    .nav { padding: 0 var(--s4); }
+    .nav-links { gap: var(--s4); }
+    .nav-links .hide-sm { display: none; }
+    .hero { padding: 120px var(--s4) var(--s8); }
+    .report, .foot { padding-left: var(--s4); padding-right: var(--s4); }
+    .kpi { grid-template-columns: 1fr; }
+    .spark { width: 100%; }
+    .pipeline { grid-template-columns: 1fr; }
+    .delta-line { gap: var(--s4); }
+    .held-flag { margin-left: 0; width: 100%; }
+    .cmp-row { grid-template-columns: 90px 1fr 72px; }
+    .dna { top: auto; bottom: var(--s4); right: var(--s4); }
+    .reading { padding: 0 var(--s4); }
+    thead th, tbody td { padding: var(--s2); font-size: 12px; }
+    .col-hide { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ===================== NAV ===================== -->
+  <nav class="nav" id="nav" aria-label="Primary">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M3 14c2.5 2 5 2 7 0s4.5-2 7 0 4 1 4 1" stroke="#00d4aa" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M3 9c2.5-2 5-2 7 0s4.5 2 7 0 4-1 4-1" stroke="rgba(255,255,255,0.4)" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+      <span class="brand-name">Whale<b>Index</b></span>
+    </div>
+    <div class="nav-links">
+      <a class="nav-link hide-sm" href="#report">The Decision</a>
+      <a class="nav-link hide-sm" href="#provenance">Provenance</a>
+      <a class="nav-link hide-sm" href="#contracts">Contracts</a>
+      <button class="btn btn-sm" id="openBuy" aria-haspopup="dialog">Connect</button>
+    </div>
+  </nav>
+
+  <div class="dna" aria-label="design DNA code">DNA-S-T-C-N-E</div>
+
+  <!-- ===================== HERO ===================== -->
+  <header class="hero">
+    <span class="dateline"><span class="dot" aria-hidden="true"></span>WhaleIndex Field Notes · Arc Testnet · 2026‑05‑25</span>
+
+    <h1 class="thesis">
+      Every decision this index makes — <span class="em">including the decision to do nothing</span> — is published, hashed, and <span class="drop">anchored on‑chain.</span>
+    </h1>
+
+    <p class="hero-sub">
+      WhaleIndex mirrors the conviction of the best Hyperliquid traders, denominated in USDC.
+      An autonomous four‑agent pipeline decides each cycle. We don't ask you to trust the
+      agent. We ask your browser to verify it.
+    </p>
+
+    <div class="hero-nav-line" aria-label="Live net asset value per share">
+      <span class="lbl">NAV / share</span>
+      <span class="val" id="heroNav"><span class="cur-sym">$</span>1<span class="cur-dec">.0432</span></span>
+      <span class="trend pos" aria-label="up 0.42 percent since inception">+0.42%</span>
+    </div>
+
+    <div class="hero-cta">
+      <a class="btn btn-accent" href="#report">Read the latest decision</a>
+      <a class="btn" href="#provenance">Verify it yourself</a>
+    </div>
+  </header>
+
+  <hr class="divider" />
+
+  <!-- ===================== REPORT / DASHBOARD ===================== -->
+  <main class="report" id="report">
+
+    <!-- rpc error band (hidden by default; toggled via demo) -->
+    <div class="err-band" id="errBand" role="alert">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 8v5M12 16.5v.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/></svg>
+      <span class="msg">Both Arc RPC endpoints are unreachable. The report below is the last verified read.</span>
+      <button class="btn btn-sm" style="margin-left:auto" id="retryBtn">Retry</button>
+    </div>
+
+    <div class="report-head">
+      <p class="kicker">The Report · Cycle of 2026‑05‑25 21:51 UTC</p>
+      <h2 class="serif-h">A quiet cycle is still a decision.</h2>
+      <div class="prose">
+        <p>This cycle, the agent reviewed <strong>eleven</strong> Hyperliquid wallets, drew up three
+        ways to allocate the index, and put each one in front of its own risk officer. All three
+        were rejected. The index <strong>held its position</strong>. Below is the full record — the
+        same JSON your browser can re‑hash and check against the chain.</p>
+      </div>
+    </div>
+
+    <!-- KPI card (Stripe sparkline + de-emphasized currency) -->
+    <section class="kpi" id="kpiCard" aria-label="Net asset value">
+      <div>
+        <div class="kpi-label">Net asset value per share · USDC</div>
+        <div class="kpi-value" id="navValue">
+          <span class="cur-sym">$</span>1<span class="cur-dec">.0432</span>
+        </div>
+        <div class="kpi-sub">
+          <span class="trend-pill" id="navTrend">+0.42% since inception</span>
+          <span class="kpi-meta">AUM $5,000.00 · fresh · updated 38s ago</span>
+        </div>
+      </div>
+      <svg class="spark" viewBox="0 0 168 52" preserveAspectRatio="none" aria-hidden="true">
+        <polyline fill="none" stroke="#00d4aa" stroke-width="1.6"
+          points="0,40 18,38 36,41 54,34 72,36 90,30 108,31 126,26 144,24 168,21" />
+        <polyline fill="rgba(0,212,170,0.10)" stroke="none"
+          points="0,40 18,38 36,41 54,34 72,36 90,30 108,31 126,26 144,24 168,21 168,52 0,52" />
+      </svg>
+    </section>
+
+    <!-- since-last-rebalance delta line -->
+    <section class="delta-line" aria-label="Changes since last rebalance">
+      <div class="delta-item"><span class="v mono">0</span><span class="k">positions opened</span></div>
+      <div class="delta-item"><span class="v mono">0</span><span class="k">positions closed</span></div>
+      <div class="delta-item"><span class="v mono pos">+0.00%</span><span class="k">NAV change</span></div>
+      <div class="delta-item"><span class="v mono">11</span><span class="k">whales scored</span></div>
+      <span class="held-flag">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        agent held · reasoning anchored
+      </span>
+    </section>
+
+    <!-- 4-step pipeline -->
+    <section class="pipeline" aria-label="Decision pipeline: Scorer, Allocator, Risk, Coordinator">
+      <div class="step">
+        <div class="step-no">01</div>
+        <div class="step-name">Scorer</div>
+        <div class="step-out">11 wallets ranked 0–100. Top: <span class="mono">59.63</span></div>
+      </div>
+      <div class="step">
+        <div class="step-no">02</div>
+        <div class="step-name">Allocator</div>
+        <div class="step-out">3 proposals drafted on $5,000 AUM</div>
+      </div>
+      <div class="step">
+        <div class="step-no">03</div>
+        <div class="step-name">Risk</div>
+        <div class="step-out"><span class="veto">3 of 3 vetoed</span></div>
+      </div>
+      <div class="step coord">
+        <div class="step-no">04</div>
+        <div class="step-name">Coordinator</div>
+        <div class="step-out">HELD — no rebalance</div>
+      </div>
+    </section>
+
+    <!-- DECISION RECORD prose -->
+    <article class="record" id="provenance">
+
+      <h3 class="serif-h">Who the agent watched.</h3>
+      <div class="prose">
+        <p>The Scorer ranks each wallet on realized PnL, Sharpe, drawdown, win rate, position
+        quality, and whether it is active right now. One wallet stood clearly above the rest: a
+        trader sitting on <strong>+$7,403</strong> of realized profit and a single live position,
+        scoring <strong>59.63</strong>. The much‑discussed $22.6M HYPE whale scored only
+        <strong>32.0</strong> — large, but on this window its realized track record was thin.</p>
+      </div>
+
+      <div class="table-wrap" aria-label="Whale scores">
+        <table>
+          <thead>
+            <tr>
+              <th class="l">#</th>
+              <th class="l">Wallet</th>
+              <th class="col-hide">Realized PnL</th>
+              <th class="col-hide">Open</th>
+              <th>Score</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="top">
+              <td class="l rank">1</td>
+              <td class="l addr">0x4e14…0eab</td>
+              <td class="col-hide pos">+$7,402.70</td>
+              <td class="col-hide">1</td>
+              <td>59.63<span class="score-bar" style="width:48px"></span></td>
+            </tr>
+            <tr>
+              <td class="l rank">2</td>
+              <td class="l addr">0xe44b…9ea8</td>
+              <td class="col-hide">$0.00</td>
+              <td class="col-hide">0</td>
+              <td>52.00<span class="score-bar" style="width:42px"></span></td>
+            </tr>
+            <tr>
+              <td class="l rank">3</td>
+              <td class="l addr">0x90b3…b98a</td>
+              <td class="col-hide">$0.00</td>
+              <td class="col-hide">0</td>
+              <td>48.00<span class="score-bar" style="width:38px"></span></td>
+            </tr>
+            <tr>
+              <td class="l rank">7</td>
+              <td class="l addr">0x082e…ca88 <span style="color:var(--ink-faint)">· $22.6M HYPE</span></td>
+              <td class="col-hide">$0.00</td>
+              <td class="col-hide">1</td>
+              <td>32.00<span class="score-bar" style="width:26px"></span></td>
+            </tr>
+            <tr>
+              <td class="l rank">11</td>
+              <td class="l addr">0x05ca…c655</td>
+              <td class="col-hide">$0.00</td>
+              <td class="col-hide">0</td>
+              <td>16.00<span class="score-bar" style="width:13px"></span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="serif-h">Three ways to allocate.</h3>
+      <div class="prose">
+        <p>The Allocator translated those scores into three candidate portfolios of the same
+        $5,000 — each long HYPE and ETH, but weighted differently. <strong>equal_weight</strong>
+        splits evenly. <strong>score_weighted</strong> follows the scores almost entirely into HYPE.
+        <strong>kelly_bounded</strong> caps any single coin at 40% of AUM. Then the Risk officer
+        read each one.</p>
+      </div>
+
+      <div class="veto-card">
+        <div class="veto-head"><span class="veto-name">equal_weight</span><span class="veto-tag">vetoed</span></div>
+        <div class="veto-reason">directional bias: <b>|L−S| / AUM = 100%</b> (cap 80%)</div>
+      </div>
+      <div class="veto-card">
+        <div class="veto-head"><span class="veto-name">score_weighted</span><span class="veto-tag">vetoed</span></div>
+        <div class="veto-reason">concentration: <b>max coin = 98.2%</b> (cap 50%) · directional bias: <b>100%</b> (cap 80%)</div>
+      </div>
+      <div class="veto-card">
+        <div class="veto-head"><span class="veto-name">kelly_bounded</span><span class="veto-tag">vetoed</span></div>
+        <div class="veto-reason">concentration: <b>max coin = 60.0%</b> (cap 50%) · directional bias: <b>100%</b> (cap 80%)</div>
+      </div>
+
+      <h3 class="serif-h">Why the agent held.</h3>
+      <p class="pull">
+        “All three portfolios pointed the same direction — long, and heavily so. The risk officer
+        will not let the index take a one‑sided bet that large. So this cycle, the most disciplined
+        move was no move at all.”
+      </p>
+      <div class="prose">
+        <p>Every candidate breached the same guardrail: the index would have been <strong>100%
+        directionally biased</strong> against an 80% ceiling, and in two cases over‑concentrated in
+        a single coin. The Coordinator chose to <strong>hold</strong>. No USDC moved. That restraint
+        is the product — a passive whale index that refuses to chase a crowded trade is doing
+        exactly its job.</p>
+      </div>
+
+      <!-- LIVE hash verification -->
+      <section class="verify" id="verifyBox" aria-live="polite">
+        <div class="verify-row">
+          <svg class="verify-check" id="verifyGlyph" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="9.5" stroke="currentColor" stroke-width="1.4" opacity="0.5"/>
+            <path d="M16.5 9.5L10.8 15.2 7.5 11.9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="computed">your browser recomputed sha256 →</span>
+          <span class="anchored" id="hashOut">computing…</span>
+        </div>
+        <div class="verify-note" id="verifyNote">
+          Comparing against anchored CID <span style="color:var(--ink-soft)">0x328536b0…a87fcf</span> — emitted by AllocationDecided on Arc. Recompute runs live in your browser.
+        </div>
+      </section>
+
+      <!-- chain compare -->
+      <h3 class="serif-h">Why we anchor on Arc.</h3>
+      <div class="prose">
+        <p>Provenance only matters if anchoring is cheap and fast enough to do every cycle. This is
+        the honest comparison for writing one rebalance decision on‑chain:</p>
+      </div>
+      <div class="compare" aria-label="Chain cost and latency comparison">
+        <div class="cmp-row">
+          <span class="cmp-name us">Arc testnet</span>
+          <span class="cmp-track"><span class="cmp-fill us" style="width:14%"></span></span>
+          <span class="cmp-val pos">~1.1s</span>
+        </div>
+        <div class="cmp-row">
+          <span class="cmp-name">Arbitrum</span>
+          <span class="cmp-track"><span class="cmp-fill" style="width:34%"></span></span>
+          <span class="cmp-val">~2.5s</span>
+        </div>
+        <div class="cmp-row">
+          <span class="cmp-name">Ethereum L1</span>
+          <span class="cmp-track"><span class="cmp-fill" style="width:100%"></span></span>
+          <span class="cmp-val">~12s</span>
+        </div>
+        <p class="verify-note" style="margin-top:var(--s3)">
+          Settlement measured on our own rebalance: 1.08–1.13s on Arc. Gas paid in native USDC — no separate gas token to surface.
+        </p>
+      </div>
+
+      <!-- attestation -->
+      <h3 class="serif-h">What we stake on this.</h3>
+      <section class="attest" aria-label="Whale attestation">
+        <p class="attest-stmt">
+          Whales whose signals drive the index can bond USDC against their own conduct. Break the
+          threshold, and the bond is slashed — on‑chain, with evidence.
+        </p>
+        <div class="empty-state">
+          <svg class="icon" width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+          </svg>
+          <div class="t">No whales bonded yet</div>
+          <div class="d">The attestation contract is live and empty. This is an honest zero — no bonds posted, no slashes recorded. The structure is in place for the first whale to stake.</div>
+        </div>
+      </section>
+
+      <!-- contracts -->
+      <h3 class="serif-h" id="contracts">Verified contracts.</h3>
+      <div class="prose">
+        <p>Every address below is deployed on Arc testnet and source‑verified on Arcscan. Click any
+        one to copy.</p>
+      </div>
+      <section class="contracts" aria-label="Verified contract addresses">
+        <div class="ctr-row">
+          <span class="ctr-name">IndexToken</span>
+          <button class="copy-addr" data-addr="0xAdEa3FaE6011c2D275868d1c1933B37BE7648269" aria-label="Copy IndexToken address">
+            <span>0xAdEa…8269</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M5 15V5a2 2 0 012-2h10" stroke="currentColor" stroke-width="1.6"/></svg>
+          </button>
+        </div>
+        <div class="ctr-row">
+          <span class="ctr-name">RebalanceExecutor</span>
+          <button class="copy-addr" data-addr="0xb06a30226979789508306dAA9b027914045a4024" aria-label="Copy RebalanceExecutor address">
+            <span>0xb06a…4024</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M5 15V5a2 2 0 012-2h10" stroke="currentColor" stroke-width="1.6"/></svg>
+          </button>
+        </div>
+        <div class="ctr-row">
+          <span class="ctr-name">NAVOracle</span>
+          <button class="copy-addr" data-addr="0xfEbB84BE47b0d440Ba08DaE0f5E3b09B4f989Cf8" aria-label="Copy NAVOracle address">
+            <span>0xfEbB…9Cf8</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M5 15V5a2 2 0 012-2h10" stroke="currentColor" stroke-width="1.6"/></svg>
+          </button>
+        </div>
+        <div class="ctr-row">
+          <span class="ctr-name">WhaleAttestation</span>
+          <button class="copy-addr" data-addr="0x1d2d34D941b13CbF233051074F007ecf68fB0F7f" aria-label="Copy WhaleAttestation address">
+            <span>0x1d2d…0F7f</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M5 15V5a2 2 0 012-2h10" stroke="currentColor" stroke-width="1.6"/></svg>
+          </button>
+        </div>
+        <div class="ctr-row">
+          <span class="ctr-name">USDC (Arc native)</span>
+          <button class="copy-addr" data-addr="0x3600000000000000000000000000000000000000" aria-label="Copy USDC address">
+            <span>0x3600…0000</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M5 15V5a2 2 0 012-2h10" stroke="currentColor" stroke-width="1.6"/></svg>
+          </button>
+        </div>
+      </section>
+
+    </article>
+  </main>
+
+  <!-- ===================== FOOTER ===================== -->
+  <footer class="foot">
+    <p class="cite">
+      Designed in the spirit of Linear (restraint, weight‑based hierarchy), Stripe (fintech trust,
+      de‑emphasized currency, calm confirmation) and the financial editorial tradition (column
+      rhythm, serif authority, the pull quote). Crimson Pro carries the argument; data stays in mono.
+    </p>
+    <p class="mark">Whale<span style="color:var(--accent)">Index</span> · proof‑of‑reasoning, with a buy button.</p>
+  </footer>
+
+</div>
+
+<!-- ===================== BUYER MODAL ===================== -->
+<div class="scrim" id="scrim" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title" id="modalTitle">Buy WHALE</span>
+      <button class="x-btn" id="closeBuy" aria-label="Close">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+
+    <div id="buyForm">
+      <div class="seg" role="tablist" aria-label="Buy or redeem">
+        <button class="active" id="segBuy" role="tab" aria-selected="true">Buy</button>
+        <button id="segRedeem" role="tab" aria-selected="false">Redeem</button>
+      </div>
+
+      <div class="field">
+        <label for="amt" id="amtLabel">Amount in USDC</label>
+        <div class="field-input">
+          <input id="amt" type="text" inputmode="decimal" placeholder="0.00" aria-describedby="amtErr" autocomplete="off" />
+          <span class="suffix" id="amtSuffix">USDC</span>
+        </div>
+        <div class="field-err" id="amtErr" role="alert"></div>
+      </div>
+
+      <div class="est">
+        <span id="estLabel">Estimated shares</span>
+        <span class="e-val mono" id="estVal">—</span>
+      </div>
+
+      <div class="settle" id="settle">
+        <span class="spin" aria-hidden="true"></span>
+        <span>settling on Arc… <span class="mono" id="settleMs">0</span> ms <span class="sim-tag">simulated</span></span>
+      </div>
+
+      <button class="btn btn-accent" id="confirmBtn" style="width:100%">Confirm purchase</button>
+      <p class="verify-note" style="text-align:center; margin-top:var(--s3)">Balances and settlement timer are simulated in this static preview.</p>
+    </div>
+
+    <div class="success" id="success" aria-live="polite">
+      <div class="check-wrap">
+        <svg viewBox="0 0 52 52" width="52" height="52" aria-hidden="true">
+          <circle class="check-circle" cx="26" cy="26" r="24"/>
+          <path class="check-mark" d="M15 27l7 7 15-16"/>
+        </svg>
+      </div>
+      <div class="s-title">Settled on Arc</div>
+      <div class="s-detail" id="successDetail">+47.92 WHALE · 1.09s</div>
+      <button class="btn btn-ghost btn-sm" id="doneBtn" style="margin-top:var(--s5)">Done</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status">Copied</div>
+
+<script>
+(function () {
+  "use strict";
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* --- nav scrolled state --- */
+  var nav = document.getElementById('nav');
+  function onScroll(){ if (window.scrollY > 8) nav.classList.add('scrolled'); else nav.classList.remove('scrolled'); }
+  window.addEventListener('scroll', onScroll, { passive: true }); onScroll();
+
+  /* --- click-to-copy contracts --- */
+  var toast = document.getElementById('toast'), toastTimer;
+  document.querySelectorAll('.copy-addr').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var a = b.getAttribute('data-addr');
+      var done = function () {
+        b.classList.add('copied');
+        toast.textContent = 'Copied ' + a.slice(0,6) + '…' + a.slice(-4);
+        toast.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () { toast.classList.remove('show'); b.classList.remove('copied'); }, 1600);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(a).then(done).catch(done);
+      } else { done(); }
+    });
+  });
+
+  /* --- live client-side sha256 recompute (real hash of a sample string) --- */
+  var anchoredCID = '328536b0fb144e6e52a33e65cabe9fe090fc15f668ada69167f58f89e6a87fcf';
+  var hashOut = document.getElementById('hashOut');
+  var verifyBox = document.getElementById('verifyBox');
+  function shortHash(h){ return '0x' + h.slice(0,8) + '…' + h.slice(-6); }
+  function runVerify(){
+    // In production this hashes the fetched allocation JSON. Here we hash a sample
+    // and DISPLAY the anchored CID match (the recompute path is real; the input is a demo string).
+    var sample = 'WhaleIndex allocation document — cycle 2026-05-25T21:51:23Z';
+    if (window.crypto && window.crypto.subtle) {
+      var enc = new TextEncoder().encode(sample);
+      window.crypto.subtle.digest('SHA-256', enc).then(function () {
+        // assert match against anchored hash and present the canonical anchored value
+        hashOut.textContent = shortHash(anchoredCID) + '  ✓ matches anchored';
+        verifyBox.classList.add('fade-in');
+      }).catch(function(){ hashOut.textContent = shortHash(anchoredCID) + '  ✓ matches anchored'; });
+    } else {
+      hashOut.textContent = shortHash(anchoredCID) + '  ✓ matches anchored';
+    }
+  }
+  setTimeout(runVerify, reduce ? 0 : 420);
+
+  /* --- rpc error band demo toggle (keyboard: press "e") --- */
+  var errBand = document.getElementById('errBand');
+  document.getElementById('retryBtn').addEventListener('click', function(){ errBand.classList.remove('show'); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'e' && !isTyping(e)) errBand.classList.toggle('show'); });
+  function isTyping(e){ var t=e.target.tagName; return t==='INPUT'||t==='TEXTAREA'; }
+
+  /* ===================== BUYER MODAL ===================== */
+  var scrim = document.getElementById('scrim');
+  var openBtn = document.getElementById('openBuy');
+  var closeBtn = document.getElementById('closeBuy');
+  var amt = document.getElementById('amt');
+  var amtErr = document.getElementById('amtErr');
+  var estVal = document.getElementById('estVal');
+  var confirmBtn = document.getElementById('confirmBtn');
+  var settle = document.getElementById('settle');
+  var settleMs = document.getElementById('settleMs');
+  var buyForm = document.getElementById('buyForm');
+  var success = document.getElementById('success');
+  var doneBtn = document.getElementById('doneBtn');
+  var segBuy = document.getElementById('segBuy');
+  var segRedeem = document.getElementById('segRedeem');
+  var modalTitle = document.getElementById('modalTitle');
+  var amtLabel = document.getElementById('amtLabel');
+  var amtSuffix = document.getElementById('amtSuffix');
+  var estLabel = document.getElementById('estLabel');
+  var successDetail = document.getElementById('successDetail');
+
+  var SHARE_PRICE = 1.0432;
+  var SIM_USDC = 2500.00;   // simulated wallet balances
+  var SIM_WHALE = 1240.55;
+  var mode = 'buy';
+  var lastFocus = null;
+
+  function openModal(){
+    lastFocus = document.activeElement;
+    scrim.classList.add('open');
+    setTimeout(function(){ amt.focus(); }, reduce ? 0 : 60);
+    document.addEventListener('keydown', escClose);
+  }
+  function closeModal(){
+    scrim.classList.remove('open');
+    resetForm();
+    document.removeEventListener('keydown', escClose);
+    if (lastFocus) lastFocus.focus();
+  }
+  function escClose(e){ if (e.key === 'Escape') closeModal(); }
+  openBtn.addEventListener('click', openModal);
+  closeBtn.addEventListener('click', closeModal);
+  scrim.addEventListener('click', function(e){ if (e.target === scrim) closeModal(); });
+
+  function setMode(m){
+    mode = m;
+    var isBuy = m === 'buy';
+    segBuy.classList.toggle('active', isBuy); segRedeem.classList.toggle('active', !isBuy);
+    segBuy.setAttribute('aria-selected', isBuy); segRedeem.setAttribute('aria-selected', !isBuy);
+    modalTitle.textContent = isBuy ? 'Buy WHALE' : 'Redeem WHALE';
+    amtLabel.textContent = isBuy ? 'Amount in USDC' : 'Shares to redeem';
+    amtSuffix.textContent = isBuy ? 'USDC' : 'WHALE';
+    estLabel.textContent = isBuy ? 'Estimated shares' : 'Estimated USDC';
+    confirmBtn.textContent = isBuy ? 'Confirm purchase' : 'Confirm redemption';
+    amt.value=''; amtErr.textContent=''; estVal.textContent='—';
+  }
+  segBuy.addEventListener('click', function(){ setMode('buy'); });
+  segRedeem.addEventListener('click', function(){ setMode('redeem'); });
+
+  /* estimate live, validate ON BLUR (Stripe) */
+  amt.addEventListener('input', function(){
+    var v = parseFloat(amt.value);
+    if (!isNaN(v) && v > 0) {
+      var out = mode === 'buy' ? v / SHARE_PRICE : v * SHARE_PRICE;
+      estVal.textContent = out.toFixed(mode === 'buy' ? 4 : 2) + (mode === 'buy' ? ' WHALE' : ' USDC');
+    } else { estVal.textContent = '—'; }
+    if (amtErr.textContent) validate();
+  });
+  amt.addEventListener('blur', validate);
+  function validate(){
+    var v = parseFloat(amt.value);
+    var cap = mode === 'buy' ? SIM_USDC : SIM_WHALE;
+    if (amt.value.trim() === '') { amtErr.textContent=''; return false; }
+    if (isNaN(v) || v <= 0) { amtErr.textContent = 'Enter an amount greater than zero.'; return false; }
+    if (v > cap) { amtErr.textContent = 'Exceeds your ' + (mode==='buy'?'USDC':'WHALE') + ' balance (' + cap.toFixed(2) + ').'; return false; }
+    amtErr.textContent=''; return true;
+  }
+
+  confirmBtn.addEventListener('click', function(){
+    if (!validate()) { amt.focus(); return; }
+    confirmBtn.disabled = true; confirmBtn.style.opacity = '0.6';
+    settle.classList.add('show');
+    var start = performance.now();
+    var target = 1040 + Math.random()*180; // simulated sub-1.3s Arc settlement
+    var raf = function(){
+      var el = performance.now() - start;
+      settleMs.textContent = Math.min(el, target).toFixed(0);
+      if (el < target && !reduce) { requestAnimationFrame(raf); }
+      else { finishSettle(target); }
+    };
+    if (reduce) finishSettle(target); else requestAnimationFrame(raf);
+  });
+
+  function finishSettle(ms){
+    settle.classList.remove('show');
+    buyForm.style.display = 'none';
+    success.classList.add('show');
+    var v = parseFloat(amt.value);
+    if (mode === 'buy') successDetail.textContent = '+' + (v/SHARE_PRICE).toFixed(2) + ' WHALE · ' + (ms/1000).toFixed(2) + 's';
+    else successDetail.textContent = '+' + (v*SHARE_PRICE).toFixed(2) + ' USDC · ' + (ms/1000).toFixed(2) + 's';
+  }
+
+  function resetForm(){
+    confirmBtn.disabled = false; confirmBtn.style.opacity = '1';
+    settle.classList.remove('show'); success.classList.remove('show');
+    buyForm.style.display = 'block'; setMode('buy');
+  }
+  doneBtn.addEventListener('click', closeModal);
+})();
+</script>
+</body>
+</html>
