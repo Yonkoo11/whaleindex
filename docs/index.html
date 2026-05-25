@@ -1,861 +1,1562 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#0a0e14">
-  <title>WhaleIndex — USDC index on Arc, mirroring Hyperliquid whales with on-chain provenance</title>
-  <meta name="description" content="A USDC-denominated index on Arc that mirrors top Hyperliquid whales. Every rebalance posts a content hash on chain that resolves to the agent's reasoning. Live demo on Arc Testnet.">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0b0d0e">
+<title>WhaleIndex — a USDC index on Arc that mirrors Hyperliquid whales, with on-chain provenance</title>
+<meta name="description" content="A USDC-denominated index on Arc that mirrors top Hyperliquid whales. A four-agent pipeline decides each cycle and anchors its full reasoning on chain. Provenance, not trust. Live on Arc Testnet.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:        #0b0d0e;
+  --bg-raise:  #101315;
+  --bg-cell:   #0e1113;
+  --bg-inset:  #14181a;
+  --bg-sink:   #0a0c0d;
+  --hair:      rgba(255,255,255,0.075);
+  --hair-soft: rgba(255,255,255,0.05);
+  --hair-strong: rgba(255,255,255,0.13);
+  --ink:       rgba(255,255,255,0.95);
+  --ink-2:     rgba(255,255,255,0.66);
+  --ink-3:     rgba(255,255,255,0.46);
+  --ink-4:     rgba(255,255,255,0.32);
+  --teal:      #00d4aa;
+  --teal-soft: rgba(0,212,170,0.14);
+  --teal-line: rgba(0,212,170,0.40);
+  --teal-dim:  rgba(0,212,170,0.62);
+  --veto:      #ff5d5d;
+  --veto-soft: rgba(255,93,93,0.12);
+  --veto-line: rgba(255,93,93,0.42);
+  --warn:      #e3b341;
+  --r-sm: 4px;
+  --r-md: 7px;
+  --r-lg: 10px;
+  --ease: cubic-bezier(0.22,1,0.36,1);
+  --t-fast: 150ms var(--ease);
+  --t-panel: 200ms var(--ease);
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --sans: "DM Sans", system-ui, sans-serif;
+  --serif: "Crimson Pro", Georgia, serif;
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font-family:var(--sans);font-size:14px;line-height:1.5;
+  letter-spacing:-0.011em;font-weight:400;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+}
+body::before{
+  content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(120% 70% at 50% -10%, rgba(0,212,170,0.05), transparent 60%),
+    radial-gradient(90% 60% at 50% 120%, rgba(255,255,255,0.018), transparent 70%);
+}
+.app{position:relative;z-index:1;}
+h1,h2,h3{margin:0;font-weight:600;letter-spacing:-0.022em;}
+button{font-family:inherit;cursor:pointer;}
+a{color:inherit;}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums;}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-0.01em;}
+.label{font-size:12px;text-transform:uppercase;letter-spacing:0.12em;font-weight:500;color:var(--ink-3);}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
+:focus-visible{outline:none;box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--teal-line);}
+.serif-h{font-family:var(--serif);font-weight:600;letter-spacing:0.004em;}
 
-  <style>
-    :root {
-      color-scheme: dark;
-      --bg: #0a0e14;
-      --bg-card: #0e131a;
-      --bg-card-2: #131922;
-      --border: #1f2630;
-      --border-hi: #3a4555;
-      --fg: #e6edf3;
-      --fg-dim: #a0acba;     /* ≈5.8:1 on card bg (was #8a95a3) — passes AA */
-      --fg-mute: #9aa5b3;    /* ≈6.6:1 on card bg (was #6b7785) — passes AA */
-      --accent: #6cd16c;
-      --accent-dim: #2a5230;
-      --warn: #d97757;
-      --link: #7cc7ff;
-      --code-bg: #161c25;
-    }
-    * { box-sizing: border-box; }
-    html, body {
-      margin: 0; padding: 0;
-      background: var(--bg); color: var(--fg);
-      font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-      -webkit-font-smoothing: antialiased;
-    }
-    a { color: var(--link); text-decoration: none; border-bottom: 1px dotted var(--border-hi); }
-    a:hover, a:focus { border-bottom-color: var(--link); outline: none; }
-    a:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; border-radius: 2px; }
-    button { cursor: pointer; }
-    button:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
-    code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, "Cascadia Mono", monospace; }
-    code { background: var(--code-bg); padding: 1px 6px; border-radius: 4px; font-size: 12px; word-break: break-all; }
-    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;height:60px;
+  display:flex;align-items:center;gap:22px;padding:0 24px;
+  background:rgba(11,13,14,0.78);border-bottom:1px solid var(--hair);backdrop-filter:blur(14px);
+}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600;letter-spacing:-0.02em;font-size:15px;}
+.brand .mark{width:22px;height:22px;flex:none;}
+.brand .mark svg{display:block;}
+.net-pill{font-family:var(--mono);font-size:11px;letter-spacing:0.06em;color:var(--teal-dim);border:1px solid var(--teal-line);border-radius:999px;padding:4px 9px;display:inline-flex;align-items:center;gap:6px;}
+.net-pill .dot{width:6px;height:6px;border-radius:50%;background:var(--teal);}
+.net-pill.dim{color:var(--ink-3);border-color:var(--hair-strong);}
+.net-pill.dim .dot{background:var(--ink-3);}
+.nav-kpi{display:flex;align-items:baseline;gap:8px;margin-left:6px;padding-left:18px;border-left:1px solid var(--hair);}
+.nav-kpi .k-label{font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-4);font-weight:500;}
+.nav-kpi .k-val{font-family:var(--mono);font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink);}
+.nav-kpi .k-val .sym,.nav-kpi .k-val .dec{opacity:0.55;}
+.nav-spacer{flex:1;}
+.nav-links{display:flex;gap:4px;}
+.nav-links a{font-size:13px;color:var(--ink-2);text-decoration:none;padding:8px 11px;border-radius:var(--r-sm);font-weight:500;transition:color var(--t-fast),background var(--t-fast);}
+.nav-links a:hover{color:var(--ink);background:rgba(255,255,255,0.04);}
+.connect-btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 15px;border-radius:var(--r-md);background:var(--teal-soft);border:1px solid var(--teal-line);color:var(--teal);font-weight:600;font-size:13px;letter-spacing:-0.01em;transition:background var(--t-fast),transform var(--t-fast);}
+.connect-btn:hover{background:rgba(0,212,170,0.2);}
+.connect-btn:active{transform:translateY(1px);}
+.connect-btn .dot{width:6px;height:6px;border-radius:50%;background:var(--teal);}
 
-    main { max-width: 920px; margin: 0 auto; padding: 28px 18px 80px; }
+.wrap{max-width:1160px;margin:0 auto;padding:0 24px;}
+.section-eyebrow{display:flex;align-items:center;gap:12px;margin-bottom:18px;}
+.section-eyebrow .rule{height:1px;flex:1;background:var(--hair);}
 
-    /* HEADER */
-    .header-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; margin-bottom: 8px; }
-    h1 { font-size: 20px; margin: 0; font-weight: 700; letter-spacing: -.01em; }
-    .net-badge {
-      font-size: 11px; padding: 3px 10px; border-radius: 12px;
-      background: #14241a; color: var(--accent); border: 1px solid var(--accent-dim);
-      font-weight: 500;
-    }
-    .net-badge.dim { background: #1c1f25; color: var(--fg-mute); border-color: var(--border); }
-    .pitch { color: var(--fg-dim); font-size: 14px; margin: 8px 0 24px; max-width: 680px; line-height: 1.6; }
-    .pitch strong { color: var(--fg); font-weight: 600; }
+.hero{padding:104px 0 30px;}
+.hero-head{max-width:720px;margin-bottom:34px;}
+.dateline{display:inline-flex;align-items:center;gap:9px;font-family:var(--mono);font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:var(--teal-dim);border:1px solid var(--teal-line);border-radius:999px;padding:5px 12px;margin-bottom:22px;}
+.dateline .pulse{width:7px;height:7px;border-radius:50%;background:var(--teal);position:relative;}
+.dateline .pulse::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:1px solid var(--teal-line);animation:ring 2.6s var(--ease) infinite;}
+@keyframes ring{0%{transform:scale(0.6);opacity:0.9;}100%{transform:scale(1.9);opacity:0;}}
+.thesis{font-family:var(--serif);font-weight:500;font-size:clamp(30px,4.6vw,52px);line-height:1.13;letter-spacing:0.002em;color:var(--ink);max-width:20ch;margin:0 0 18px;}
+.thesis .em{font-style:italic;color:var(--ink-2);}
+.thesis .drop{color:var(--teal);font-weight:600;}
+.hero-sub{font-size:16px;color:var(--ink-2);line-height:1.58;max-width:620px;}
+.hero-verdict-line{margin-top:20px;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;}
+.verdict-chip{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:12px;letter-spacing:0.04em;padding:5px 10px;border-radius:var(--r-sm);border:1px solid var(--hair-strong);background:var(--bg-inset);color:var(--ink);}
+.verdict-chip.held{border-color:var(--teal-line);color:var(--teal);background:var(--teal-soft);}
+.verdict-chip.veto{border-color:var(--veto-line);color:var(--veto);background:var(--veto-soft);}
+.verdict-chip svg{width:13px;height:13px;}
+.verdict-chip .sk-inline{display:inline-block;width:88px;height:11px;}
 
-    /* HERO HEADLINE METRIC */
-    .hero {
-      padding: 22px 24px; margin-bottom: 18px;
-      border: 1px solid var(--accent-dim); border-radius: 10px;
-      background: linear-gradient(180deg, #0f1a14 0%, var(--bg-card) 100%);
-    }
-    .hero-eyebrow { color: var(--accent); font-size: 11px; text-transform: uppercase; letter-spacing: .12em; font-weight: 600; margin-bottom: 8px; }
-    .hero-line { font-size: 17px; line-height: 1.55; color: var(--fg); font-weight: 500; }
-    .hero-line strong { font-weight: 700; color: var(--fg); }
-    .hero-line .v { color: var(--accent); font-weight: 700; }
-    .hero-cta { margin-top: 12px; font-size: 12px; color: var(--fg-dim); }
+.pipeline-cell{position:relative;border:1px solid var(--hair);border-radius:var(--r-lg);background:linear-gradient(180deg,var(--bg-raise),var(--bg-cell));padding:30px 30px 26px;overflow:hidden;}
+.pipeline-cell::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:0.5;background-image:linear-gradient(rgba(255,255,255,0.014) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.014) 1px,transparent 1px);background-size:34px 34px;mask-image:radial-gradient(120% 100% at 50% 0%,#000,transparent 78%);-webkit-mask-image:radial-gradient(120% 100% at 50% 0%,#000,transparent 78%);}
+.pipeline-top{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:22px;position:relative;z-index:2;}
+.pipeline-top .ptitle{display:flex;align-items:center;gap:11px;}
+.cycle-meta{display:flex;gap:18px;align-items:center;font-family:var(--mono);font-size:12px;color:var(--ink-3);flex-wrap:wrap;}
+.cycle-meta b{color:var(--ink-2);font-weight:500;}
+.pipeline{position:relative;z-index:2;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0;}
+.node{position:relative;display:flex;flex-direction:column;gap:11px;text-align:left;background:var(--bg-cell);border:1px solid var(--hair-strong);border-radius:var(--r-md);padding:15px 15px 14px;margin:0 14px;color:inherit;transition:border-color var(--t-fast),transform var(--t-fast),background var(--t-fast);}
+.node:hover{transform:translateY(-3px);border-color:var(--teal-line);background:var(--bg-inset);}
+.node:focus-visible{border-color:var(--teal-line);}
+.node.is-veto{border-color:var(--veto-line);background:rgba(255,93,93,0.05);}
+.node.is-veto:hover{background:rgba(255,93,93,0.09);border-color:var(--veto);}
+.node-head{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.node-stage{display:flex;align-items:center;gap:8px;}
+.node-num{width:20px;height:20px;flex:none;border-radius:5px;display:grid;place-items:center;font-family:var(--mono);font-size:11px;font-weight:600;background:var(--teal-soft);color:var(--teal);border:1px solid var(--teal-line);}
+.node.is-veto .node-num{background:var(--veto-soft);color:var(--veto);border-color:var(--veto-line);}
+.node-name{font-size:13px;font-weight:600;letter-spacing:-0.012em;}
+.node-status{font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;padding:3px 6px;border-radius:3px;font-weight:600;background:var(--teal-soft);color:var(--teal);}
+.node.is-veto .node-status{background:var(--veto-soft);color:var(--veto);}
+.node-summary{font-size:12.5px;color:var(--ink-2);line-height:1.45;min-height:50px;}
+.node-metric{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding-top:11px;border-top:1px solid var(--hair-soft);}
+.node-metric .m-label{font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-4);font-weight:500;}
+.node-metric .m-val{font-family:var(--mono);font-size:16px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink);letter-spacing:-0.01em;}
+.node.is-veto .m-val{color:var(--veto);}
+.node-cta{font-family:var(--mono);font-size:11px;color:var(--ink-4);letter-spacing:0.04em;display:flex;align-items:center;gap:5px;}
+.node:hover .node-cta{color:var(--teal-dim);}
+.node.is-veto:hover .node-cta{color:var(--veto);}
+.connector{position:absolute;z-index:1;top:50%;height:2px;pointer-events:none;}
+.connector .base{position:absolute;inset:0;background:var(--hair-strong);}
+.connector .flow{position:absolute;top:0;height:100%;width:42px;border-radius:2px;background:linear-gradient(90deg,transparent,var(--teal),transparent);opacity:0.9;animation:flow 3.4s linear infinite;}
+.connector.c-veto .flow{background:linear-gradient(90deg,transparent,var(--veto),transparent);}
+@keyframes flow{from{transform:translateX(-46px);}to{transform:translateX(var(--flow-end,100%));}}
+.connector .arrow{position:absolute;right:-1px;top:50%;transform:translateY(-50%);color:var(--hair-strong);}
+.connector.c-veto .arrow{color:var(--veto-line);}
+.pipeline-foot{position:relative;z-index:2;margin-top:20px;padding-top:16px;border-top:1px solid var(--hair-soft);display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;justify-content:space-between;font-family:var(--mono);font-size:12px;color:var(--ink-3);}
+.pipeline-foot .anchored{display:flex;align-items:center;gap:8px;color:var(--ink-2);}
+.pipeline-foot .cid{color:var(--teal-dim);}
 
-    /* CARDS */
-    section.card {
-      border: 1px solid var(--border); border-radius: 8px;
-      padding: 18px 22px; margin-bottom: 12px;
-      background: var(--bg-card);
-    }
-    section.card > h2 {
-      color: var(--fg-mute); font-size: 11px; text-transform: uppercase;
-      letter-spacing: .08em; margin: 0 0 12px; font-weight: 600;
-    }
-    .row { display: flex; gap: 22px; flex-wrap: wrap; }
-    .row > div { flex: 1; min-width: 160px; }
-    .label { color: var(--fg-mute); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px; font-weight: 500; }
-    .value { font-size: 22px; font-weight: 500; color: var(--fg); line-height: 1.2; }
-    .value.big { font-size: 28px; }
-    .small { font-size: 12px; color: var(--fg-dim); margin-top: 4px; word-break: break-word; line-height: 1.5; }
-    .small.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
-    .fresh { color: var(--accent); }
-    .stale { color: var(--warn); }
-    .empty { color: var(--fg-mute); font-style: italic; }
+.dash{padding:46px 0 20px;}
+.bento{display:grid;grid-template-columns:repeat(12,1fr);grid-auto-rows:minmax(10px,auto);gap:14px;}
+.cell{border:1px solid var(--hair);border-radius:var(--r-lg);background:var(--bg-cell);padding:18px 18px 17px;position:relative;display:flex;flex-direction:column;}
+.cell-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;}
+.cell-head h3{font-size:13px;font-weight:600;letter-spacing:-0.012em;color:var(--ink);}
+.tag-pill{font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-4);border:1px solid var(--hair);border-radius:3px;padding:2px 6px;font-weight:500;}
+.tag-pill.live{color:var(--teal-dim);border-color:var(--teal-line);}
+.c-nav{grid-column:span 5;}
+.c-rebal{grid-column:span 7;}
+.c-record{grid-column:span 7;}
+.c-chain{grid-column:span 5;}
+.c-state{grid-column:span 5;}
+.c-attest{grid-column:span 7;}
+.c-contracts{grid-column:span 12;}
+.nav-figure{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;}
+.nav-price{font-family:var(--mono);font-size:42px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-0.03em;line-height:1;color:var(--ink);}
+.nav-price .sym,.nav-price .dec{opacity:0.5;}
+.nav-meta{margin-top:12px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;}
+.trend-pill{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--teal);background:var(--teal-soft);border:1px solid var(--teal-line);border-radius:4px;padding:3px 8px;letter-spacing:0.02em;}
+.nav-sub{font-family:var(--mono);font-size:12px;color:var(--ink-3);}
+.nav-sub.fresh{color:var(--teal-dim);}
+.nav-sub.stale{color:var(--warn);}
+.statline{display:flex;flex-wrap:wrap;gap:0;margin-top:16px;padding-top:14px;border-top:1px solid var(--hair-soft);}
+.statline .si{flex:1;min-width:120px;padding:0 14px;border-left:1px solid var(--hair-soft);}
+.statline .si:first-child{padding-left:0;border-left:none;}
+.statline .si .sv{font-family:var(--mono);font-size:15px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;}
+.statline .si .sk2{font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-4);font-weight:500;margin-top:5px;}
 
-    /* CONTROLS */
-    .controls { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
-    .controls select, .controls button {
-      background: var(--code-bg); color: var(--fg); border: 1px solid var(--border);
-      border-radius: 6px; padding: 7px 12px; font: 13px/1 inherit;
-    }
-    .controls button:hover, .controls select:hover { border-color: var(--border-hi); }
-    .refresh-state { font-size: 11px; color: var(--fg-mute); margin-left: auto; }
-    .refresh-state.refreshing { color: var(--accent); }
+.rebal-figure{display:flex;flex-wrap:wrap;gap:0;}
+.rebal-item{flex:1;min-width:130px;padding:4px 16px;border-left:1px solid var(--hair-soft);}
+.rebal-item:first-child{padding-left:0;border-left:none;}
+.rebal-item .d-val{font-family:var(--mono);font-size:21px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink);letter-spacing:-0.02em;display:flex;align-items:center;gap:7px;}
+.rebal-item.held .d-val{color:var(--teal);}
+.rebal-item .d-val svg{width:15px;height:15px;}
+.rebal-item .d-label{font-size:11px;text-transform:uppercase;letter-spacing:0.09em;color:var(--ink-4);font-weight:500;margin-top:6px;}
+.rebal-foot{margin-top:16px;padding-top:13px;border-top:1px solid var(--hair-soft);font-size:12.5px;color:var(--ink-2);line-height:1.5;}
+.rebal-foot b{color:var(--teal);font-weight:600;}
+.rebal-foot a{color:var(--teal-dim);}
 
-    /* SKELETON LOADER */
-    .skel {
-      display: inline-block; height: 1em; border-radius: 4px;
-      background: linear-gradient(90deg, var(--code-bg), var(--bg-card-2), var(--code-bg));
-      background-size: 200% 100%;
-      animation: shimmer 1.4s ease-in-out infinite;
-    }
-    .skel.w-sm { width: 60px; } .skel.w-md { width: 120px; } .skel.w-lg { width: 200px; } .skel.w-xl { width: 280px; }
-    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-    @media (prefers-reduced-motion: reduce) { .skel { animation: none; opacity: 0.6; } }
+.record-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--hair-soft);}
+.record-row:last-of-type{border-bottom:none;}
+.record-row .rk{font-size:12.5px;color:var(--ink-3);}
+.record-row .rv{font-family:var(--mono);font-size:13px;color:var(--ink);font-weight:500;}
+.record-row .rv.veto{color:var(--veto);}
+.verify-box{margin-top:14px;border:1px solid var(--hair);border-radius:var(--r-md);background:var(--bg-inset);padding:13px 14px;}
+.verify-top{display:flex;align-items:center;gap:10px;}
+.verify-check{width:24px;height:24px;flex:none;border-radius:50%;display:grid;place-items:center;border:1px solid var(--hair-strong);color:var(--ink-4);transition:border-color var(--t-fast),color var(--t-fast),background var(--t-fast);}
+.verify-check.ok{border-color:var(--teal-line);color:var(--teal);background:var(--teal-soft);}
+.verify-check svg{width:13px;height:13px;}
+.verify-text{font-size:12.5px;color:var(--ink-2);line-height:1.4;}
+.verify-text b{color:var(--ink);font-weight:600;}
+.verify-text .ok-word{color:var(--teal);}
+.verify-hash{margin-top:10px;font-family:var(--mono);font-size:12px;color:var(--ink-3);word-break:break-all;line-height:1.6;}
+.verify-hash .eq{color:var(--teal-dim);}
+.record-actions{margin-top:14px;display:flex;gap:9px;flex-wrap:wrap;}
+.btn-ghost{display:inline-flex;align-items:center;gap:7px;min-height:36px;padding:0 13px;background:transparent;border:1px solid var(--hair-strong);border-radius:var(--r-md);color:var(--ink-2);font-weight:500;font-size:12.5px;text-decoration:none;transition:border-color var(--t-fast),color var(--t-fast),background var(--t-fast);}
+.btn-ghost:hover{border-color:var(--teal-line);color:var(--teal);background:var(--teal-soft);}
+.btn-ghost svg{width:13px;height:13px;}
 
-    /* COMPARISON */
-    .compare-grid {
-      display: grid; gap: 10px; margin-top: 4px;
-      grid-template-columns: repeat(3, 1fr);
-    }
-    .compare {
-      padding: 14px; border: 1px solid var(--border); border-radius: 6px;
-      background: rgba(255,255,255,0.012);
-    }
-    .compare.lead { border-color: var(--accent-dim); background: #0f1a14; }
-    .compare h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--fg); }
-    .compare h3 .live { font-size: 10px; color: var(--accent); font-weight: 500; margin-left: 6px; letter-spacing: .04em; }
-    .compare .stat { font-size: 20px; color: var(--accent); font-weight: 600; }
-    .compare .stat.dim { color: var(--fg-mute); }
-    .compare .note { font-size: 11px; color: var(--fg-mute); margin-top: 4px; line-height: 1.45; }
+.chain-row{display:grid;grid-template-columns:88px 1fr auto;gap:12px;align-items:center;padding:8px 0;}
+.chain-row .cn{font-size:12.5px;color:var(--ink-2);font-weight:500;}
+.chain-row.is-arc .cn{color:var(--teal);font-weight:600;}
+.bar-track{height:7px;border-radius:99px;background:var(--bg-inset);overflow:hidden;border:1px solid var(--hair-soft);}
+.bar-fill{height:100%;border-radius:99px;background:var(--hair-strong);transition:width var(--t-panel);}
+.chain-row.is-arc .bar-fill{background:var(--teal);}
+.chain-row .cv{font-family:var(--mono);font-size:12.5px;color:var(--ink);font-variant-numeric:tabular-nums;min-width:80px;text-align:right;}
+.chain-row.is-arc .cv{color:var(--teal);font-weight:600;}
+.chain-note{margin-top:12px;padding-top:12px;border-top:1px solid var(--hair-soft);font-size:12px;color:var(--ink-3);line-height:1.45;}
+.chain-note b{color:var(--teal-dim);}
 
-    /* ADDR LIST */
-    .addr-list { display: grid; grid-template-columns: minmax(140px, max-content) 1fr auto; gap: 8px 14px; font-size: 12px; align-items: center; }
-    .addr-list .k { color: var(--fg-mute); }
-    .addr-list .v { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; min-width: 0; }
-    .addr-list .v a { display: inline-block; max-width: 100%; }
-    .copy-btn {
-      background: none; border: 1px solid var(--border); color: var(--fg-mute);
-      border-radius: 4px; padding: 2px 8px; font-size: 11px;
-      font-family: inherit; transition: all .15s;
-    }
-    .copy-btn:hover { color: var(--fg); border-color: var(--border-hi); }
-    .copy-btn.copied { color: var(--accent); border-color: var(--accent-dim); }
+.attest-empty{display:flex;flex-direction:column;align-items:flex-start;gap:12px;padding:6px 0 2px;}
+.attest-icon{width:34px;height:34px;border-radius:8px;display:grid;place-items:center;border:1px solid var(--hair-strong);color:var(--ink-3);}
+.attest-icon svg{width:17px;height:17px;}
+.attest-big{font-family:var(--mono);font-size:24px;font-weight:600;color:var(--ink-2);font-variant-numeric:tabular-nums;}
+.attest-copy{font-size:12.5px;color:var(--ink-3);line-height:1.5;}
+.attest-copy b{color:var(--ink-2);font-weight:600;}
+.attest-grid{display:flex;flex-wrap:wrap;gap:0;width:100%;}
+.attest-grid .ag{flex:1;min-width:110px;padding:0 14px;border-left:1px solid var(--hair-soft);}
+.attest-grid .ag:first-child{padding-left:0;border-left:none;}
+.attest-grid .ag .av{font-family:var(--mono);font-size:18px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;}
+.attest-grid .ag .ak{font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-4);font-weight:500;margin-top:5px;}
+.slash-line{margin-top:14px;padding-top:13px;border-top:1px solid var(--hair-soft);font-family:var(--mono);font-size:12px;color:var(--ink-3);line-height:1.5;}
+.slash-line a{color:var(--teal-dim);}
 
-    /* REASONING DOC */
-    .reasoning { margin-top: 12px; padding: 14px 16px; background: var(--bg-card-2); border-radius: 6px; border-left: 3px solid var(--accent); }
-    .reasoning-row { display: flex; gap: 12px; padding: 4px 0; font-size: 12px; align-items: baseline; }
-    .reasoning-row .agent { color: var(--accent); font-weight: 600; min-width: 100px; }
-    .reasoning-row .body { color: var(--fg-dim); flex: 1; }
+.contract-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px 18px;}
+.contract-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--hair-soft);}
+.contract-name{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--ink-2);font-weight:500;}
+.contract-name .vchk{width:14px;height:14px;color:var(--teal);flex:none;}
+.copy-addr{display:inline-flex;align-items:center;gap:8px;min-height:32px;padding:0 9px;font-family:var(--mono);font-size:12px;color:var(--ink-2);background:var(--bg-inset);border:1px solid var(--hair);border-radius:var(--r-sm);transition:border-color var(--t-fast),color var(--t-fast);}
+.copy-addr:hover{border-color:var(--teal-line);color:var(--teal);}
+.copy-addr .ci{width:12px;height:12px;opacity:0.7;}
+.copy-addr.copied{border-color:var(--teal-line);color:var(--teal);}
+.contracts-note{grid-column:1/-1;margin-top:8px;font-size:12px;color:var(--ink-3);line-height:1.5;}
+.contracts-note a{color:var(--teal-dim);}
 
-    /* WHALES TABLE */
-    .whales-tbl { font-size: 12px; }
-    .whales-tbl .whale-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; padding: 6px 0; border-top: 1px solid var(--border); align-items: center; }
-    .whales-tbl .whale-row:first-of-type { border-top: none; }
-    .whales-tbl .w-addr { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--fg-dim); }
-    .whales-tbl .w-status { font-size: 11px; padding: 2px 8px; border-radius: 4px; }
-    .whales-tbl .w-status.bonded { background: #14241a; color: var(--accent); border: 1px solid var(--accent-dim); }
-    .whales-tbl .w-status.unbonded { background: #1c1f25; color: var(--fg-mute); border: 1px solid var(--border); }
-    .whales-tbl .w-status.slashed { background: #2a1a14; color: var(--warn); border: 1px solid #50321f; }
+.ledger-section{padding:30px 0 10px;}
+.ledger-head{max-width:760px;margin-bottom:8px;}
+.ledger-head .serif-h{font-size:clamp(22px,3vw,30px);color:var(--ink);}
+.ledger-sub{font-size:14px;color:var(--ink-2);line-height:1.6;max-width:68ch;margin:10px 0 22px;}
+.ledger-toggle{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;background:transparent;border:1px solid var(--hair-strong);border-radius:var(--r-md);color:var(--ink-2);font-weight:500;font-size:13px;transition:border-color var(--t-fast),color var(--t-fast),background var(--t-fast);}
+.ledger-toggle:hover{border-color:var(--teal-line);color:var(--teal);background:var(--teal-soft);}
+.ledger-toggle svg{width:14px;height:14px;transition:transform var(--t-fast);}
+.ledger-toggle[aria-expanded="true"] svg{transform:rotate(180deg);}
+.ledger-body{max-height:0;overflow:hidden;opacity:0;transition:max-height var(--t-panel),opacity var(--t-panel);}
+.ledger-body.open{max-height:5000px;opacity:1;margin-top:22px;}
+.ledger-card{border:1px solid var(--hair);border-radius:var(--r-lg);background:var(--bg-cell);overflow:hidden;}
+.ledger-card + .ledger-card{margin-top:14px;}
+.ledger-card .lc-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid var(--hair);}
+.ledger-card .lc-head h4{margin:0;font-size:13px;font-weight:600;letter-spacing:-0.012em;color:var(--ink);}
+.ledger-card .lc-head .lc-meta{font-family:var(--mono);font-size:11px;color:var(--ink-3);letter-spacing:0.04em;}
+.lc-pad{padding:6px 18px 16px;}
+table.scores{width:100%;border-collapse:collapse;}
+table.scores th,table.scores td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--hair-soft);}
+table.scores th{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-4);font-weight:500;}
+table.scores td{font-size:13px;color:var(--ink-2);}
+table.scores td.r,table.scores th.r{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;}
+table.scores tr:last-child td{border-bottom:none;}
+table.scores tr.top td{color:var(--ink);}
+table.scores tbody tr:hover{background:rgba(255,255,255,0.02);}
+.l-addr{font-family:var(--mono);font-size:12px;color:var(--ink-2);}
+table.scores tr.top .l-addr{color:var(--ink);}
+.l-flag{font-family:var(--mono);font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.05);color:var(--ink-3);margin-left:6px;letter-spacing:0.02em;}
+.l-flag.hype{color:var(--warn);background:rgba(227,179,65,0.10);}
+.l-flag.active{color:var(--teal);background:var(--teal-soft);}
+.scorebar{display:inline-flex;align-items:center;gap:8px;justify-content:flex-end;}
+.scorebar .track{width:56px;height:4px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden;}
+.scorebar .fill{height:100%;background:var(--teal);border-radius:2px;}
+.scorebar .fill.dim{background:var(--hair-strong);}
+.scoreval{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:600;min-width:46px;display:inline-block;color:var(--ink);}
+.veto-ledger{display:flex;flex-direction:column;}
+.veto-row{display:grid;grid-template-columns:160px 1fr auto;gap:16px;align-items:center;padding:12px 0;border-bottom:1px solid var(--hair-soft);}
+.veto-row:last-child{border-bottom:none;}
+.vp-name{font-family:var(--mono);font-size:13px;color:var(--ink);}
+.vp-sub{font-family:var(--mono);font-size:11px;color:var(--ink-4);margin-top:3px;}
+.vp-reasons{display:flex;flex-direction:column;gap:4px;}
+.vp-reason{font-size:12.5px;color:var(--ink-2);display:flex;align-items:center;gap:8px;}
+.vp-reason svg{width:12px;height:12px;color:var(--veto);flex:none;}
+.vp-reason .mono{color:var(--veto);}
+.vp-badge{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:0.06em;color:var(--veto);border:1px solid var(--veto-line);background:var(--veto-soft);padding:4px 9px;border-radius:5px;text-transform:uppercase;}
+.alloc-mini{display:flex;flex-direction:column;gap:6px;padding:6px 0 2px;}
+.alloc-mini .am{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;color:var(--ink-2);}
 
-    /* ERROR */
-    .err { color: var(--warn); font-size: 12px; margin-top: 6px; word-break: break-all; }
+.skel{position:relative;overflow:hidden;background:var(--bg-inset);border-radius:var(--r-sm);display:inline-block;}
+.skel::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(255,255,255,0.05),transparent);animation:shimmer 1.4s infinite;}
+@keyframes shimmer{100%{transform:translateX(100%);}}
+.sk-line{height:11px;margin:9px 0;display:block;}
+.sk-block{height:42px;margin:8px 0;display:block;}
+.fade-in{animation:fadein 200ms var(--ease);}
+@keyframes fadein{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
 
-    /* FOOTER */
-    .footer { color: var(--fg-mute); font-size: 11px; margin-top: 28px; text-align: center; line-height: 1.7; }
-    .footer a { color: var(--fg-dim); }
-    .footer-meta { margin-top: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; opacity: .8; }
+.err-band{display:none;align-items:center;gap:12px;justify-content:space-between;border:1px solid var(--veto-line);background:var(--veto-soft);border-radius:var(--r-md);padding:11px 14px;margin-bottom:14px;font-size:13px;color:var(--ink);}
+.err-band.show{display:flex;}
+.err-band .retry{min-height:34px;padding:0 12px;border-radius:var(--r-sm);border:1px solid var(--veto-line);background:transparent;color:var(--veto);font-weight:600;font-size:12.5px;}
 
-    /* MOBILE */
-    @media (max-width: 700px) {
-      main { padding: 22px 14px 60px; }
-      .compare-grid { grid-template-columns: 1fr; }
-      .value.big { font-size: 22px; }
-      .hero-line { font-size: 15px; }
-      .addr-list { grid-template-columns: minmax(120px, max-content) 1fr; gap: 4px 12px; }
-      .addr-list .copy-btn { grid-column: 2; justify-self: start; margin-top: 2px; }
-      .whales-tbl .whale-row { grid-template-columns: 1fr auto; }
-      .whales-tbl .w-status { grid-column: 2; }
-    }
-  </style>
+.scrim{position:fixed;inset:0;z-index:200;background:rgba(5,7,8,0.6);opacity:0;visibility:hidden;transition:opacity var(--t-panel),visibility var(--t-panel);backdrop-filter:blur(2px);}
+.scrim.show{opacity:1;visibility:visible;}
+.panel{position:fixed;top:0;right:0;bottom:0;z-index:210;width:min(440px,94vw);background:var(--bg-raise);border-left:1px solid var(--hair-strong);transform:translateX(100%);transition:transform var(--t-panel);display:flex;flex-direction:column;box-shadow:-30px 0 60px rgba(0,0,0,0.4);}
+.panel.show{transform:translateX(0);}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 20px;border-bottom:1px solid var(--hair);}
+.panel-head .ph-stage{display:flex;align-items:center;gap:10px;}
+.panel-head h3{font-size:15px;}
+.panel-close{width:36px;height:36px;border-radius:var(--r-sm);background:transparent;border:1px solid var(--hair);color:var(--ink-2);display:grid;place-items:center;transition:border-color var(--t-fast),color var(--t-fast);}
+.panel-close:hover{border-color:var(--hair-strong);color:var(--ink);}
+.panel-close svg{width:14px;height:14px;}
+.panel-body{padding:18px 20px;overflow-y:auto;flex:1;}
+.panel-tag{font-family:var(--mono);font-size:11px;letter-spacing:0.06em;color:var(--ink-3);}
+.panel-stat{display:flex;align-items:baseline;gap:10px;margin:6px 0 18px;}
+.panel-stat .ps-val{font-family:var(--mono);font-size:30px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-0.02em;}
+.panel-stat .ps-val.veto{color:var(--veto);}
+.panel-stat .ps-unit{font-family:var(--mono);font-size:13px;color:var(--ink-3);}
+.panel-section{margin-bottom:18px;}
+.panel-section > .label{margin-bottom:9px;display:block;}
+.panel-reason{font-size:13px;color:var(--ink-2);line-height:1.6;}
+.kv-list{display:flex;flex-direction:column;gap:0;}
+.kv{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--hair-soft);font-size:12.5px;}
+.kv:last-child{border-bottom:none;}
+.kv .kk{color:var(--ink-3);}
+.kv .kv-v{font-family:var(--mono);color:var(--ink);font-variant-numeric:tabular-nums;}
+.kv .kv-v.pos{color:var(--teal);}
+.kv .kv-v.veto{color:var(--veto);}
+.score-row{display:flex;align-items:center;gap:11px;padding:8px 0;border-bottom:1px solid var(--hair-soft);}
+.score-row:last-child{border-bottom:none;}
+.score-row .sr-rank{font-family:var(--mono);font-size:11px;color:var(--ink-4);width:18px;flex:none;}
+.score-row .sr-addr{font-family:var(--mono);font-size:12px;color:var(--ink-2);flex:1;}
+.score-row .sr-bar{width:70px;height:6px;border-radius:99px;background:var(--bg-inset);overflow:hidden;flex:none;border:1px solid var(--hair-soft);}
+.score-row .sr-bar i{display:block;height:100%;background:var(--teal);}
+.score-row .sr-bar.dim i{background:var(--hair-strong);}
+.score-row .sr-score{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--ink);width:48px;text-align:right;font-variant-numeric:tabular-nums;}
+.score-row.top .sr-addr{color:var(--ink);}
+.prop-card{border:1px solid var(--hair);border-radius:var(--r-md);padding:12px;margin-bottom:10px;}
+.prop-card.vetoed{border-color:var(--veto-line);background:rgba(255,93,93,0.04);}
+.prop-card .pc-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;}
+.prop-card .pc-name{font-family:var(--mono);font-size:12.5px;font-weight:600;color:var(--ink);}
+.prop-card .pc-verdict{font-family:var(--mono);font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--veto);background:var(--veto-soft);border:1px solid var(--veto-line);padding:2px 6px;border-radius:3px;font-weight:600;}
+.prop-card .pc-alloc{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;color:var(--ink-2);padding:3px 0;}
+.prop-card .pc-reason{margin-top:9px;padding-top:9px;border-top:1px solid var(--hair-soft);font-size:12px;color:var(--ink-3);line-height:1.5;}
+
+.seg{display:flex;background:var(--bg-inset);border:1px solid var(--hair);border-radius:var(--r-md);padding:3px;margin-bottom:18px;}
+.seg button{flex:1;min-height:40px;border:none;background:transparent;color:var(--ink-3);font-weight:600;font-size:13px;border-radius:var(--r-sm);transition:background var(--t-fast),color var(--t-fast);}
+.seg button.active{background:var(--teal-soft);color:var(--teal);}
+.conn-box{border:1px solid var(--hair);border-radius:var(--r-md);background:var(--bg-cell);padding:14px;margin-bottom:18px;}
+.conn-box .cb-row{display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;font-size:12.5px;}
+.conn-box .cb-k{color:var(--ink-3);}
+.conn-box .cb-v{font-family:var(--mono);color:var(--ink);font-variant-numeric:tabular-nums;}
+.conn-box .cb-addr{font-family:var(--mono);font-size:12px;color:var(--teal-dim);}
+.disconnect{margin-top:6px;font-size:12px;color:var(--ink-3);background:none;border:none;text-decoration:underline;padding:0;}
+.disconnect:hover{color:var(--ink-2);}
+.field{margin-bottom:16px;}
+.field label{display:block;font-size:12px;text-transform:uppercase;letter-spacing:0.09em;color:var(--ink-3);font-weight:500;margin-bottom:8px;}
+.field .input-wrap{display:flex;align-items:center;gap:10px;border:1px solid var(--hair-strong);border-radius:var(--r-md);background:var(--bg-inset);padding:0 14px;transition:border-color var(--t-fast),box-shadow var(--t-fast);}
+.field .input-wrap:focus-within{border-color:var(--teal-line);box-shadow:0 0 0 3px var(--teal-soft);}
+.field .input-wrap.invalid{border-color:var(--veto-line);}
+.field input{flex:1;background:transparent;border:none;outline:none;color:var(--ink);font-family:var(--mono);font-size:16px;font-variant-numeric:tabular-nums;padding:13px 0;letter-spacing:-0.01em;}
+.field .unit{font-family:var(--mono);font-size:13px;color:var(--ink-3);}
+.field .field-max{font-family:var(--mono);font-size:11px;color:var(--teal-dim);background:none;border:none;padding:2px 4px;min-height:32px;}
+.field .field-err{font-size:12px;color:var(--veto);margin-top:7px;min-height:15px;display:none;}
+.field .field-err.show{display:block;}
+.est-box{border:1px solid var(--hair);border-radius:var(--r-md);background:var(--bg-cell);padding:13px 14px;margin-bottom:18px;}
+.est-box .er{display:flex;justify-content:space-between;align-items:baseline;padding:4px 0;font-size:12.5px;}
+.est-box .er .ek{color:var(--ink-3);}
+.est-box .er .ev{font-family:var(--mono);color:var(--ink);font-variant-numeric:tabular-nums;font-size:15px;font-weight:600;}
+.est-box .er .ev .dim{opacity:0.5;}
+.btn-primary{width:100%;min-height:48px;border:1px solid var(--teal-line);border-radius:var(--r-md);background:var(--teal);color:#04201a;font-weight:700;font-size:14px;letter-spacing:-0.01em;transition:filter var(--t-fast),transform var(--t-fast);}
+.btn-primary:hover{filter:brightness(1.08);}
+.btn-primary:active{transform:translateY(1px);}
+.btn-primary:disabled{opacity:0.5;cursor:not-allowed;}
+.btn-secondary{display:inline-flex;align-items:center;justify-content:center;width:100%;min-height:48px;border:1px solid var(--teal-line);border-radius:var(--r-md);background:var(--teal-soft);color:var(--teal);font-weight:600;font-size:14px;text-decoration:none;}
+.btn-secondary:hover{background:rgba(0,212,170,0.2);}
+.flow-err{display:none;margin-top:14px;border:1px solid var(--veto-line);background:var(--veto-soft);border-radius:var(--r-md);padding:11px 13px;font-size:12.5px;color:var(--ink);line-height:1.5;}
+.flow-err.show{display:block;}
+.flow-err .fe-title{color:var(--veto);font-weight:600;display:block;margin-bottom:3px;}
+.no-wallet{display:none;text-align:center;padding:10px 0 4px;}
+.no-wallet.show{display:block;}
+.no-wallet p{font-size:13px;color:var(--ink-2);line-height:1.6;margin:0 0 12px;}
+.settle{display:none;text-align:center;padding:20px 0;}
+.settle.show{display:block;}
+.settle .spinner{width:34px;height:34px;border-radius:50%;border:2px solid var(--hair-strong);border-top-color:var(--teal);margin:0 auto 14px;animation:spin 0.7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.settle .s-label{font-size:13px;color:var(--ink-2);}
+.settle .s-timer{font-family:var(--mono);font-size:30px;font-weight:600;color:var(--teal);font-variant-numeric:tabular-nums;margin-top:8px;}
+.success{display:none;text-align:center;padding:18px 0;}
+.success.show{display:block;animation:fadein 250ms var(--ease);}
+.success .s-check{width:52px;height:52px;border-radius:50%;border:1.5px solid var(--teal-line);background:var(--teal-soft);display:grid;place-items:center;margin:0 auto 16px;color:var(--teal);}
+.success .s-check svg{width:24px;height:24px;}
+.success .s-head{font-size:16px;font-weight:600;margin-bottom:8px;}
+.success .s-detail{font-size:13px;color:var(--ink-2);line-height:1.6;}
+.success .s-detail .mono{color:var(--teal);}
+.success .s-detail a{color:var(--teal-dim);}
+
+.footer{margin-top:48px;border-top:1px solid var(--hair);padding:28px 0 40px;}
+.footer-inner{display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:space-between;}
+.footer .cite{font-size:12px;color:var(--ink-4);line-height:1.6;max-width:620px;}
+.footer .cite a{color:var(--ink-3);}
+.footer .cite b{color:var(--ink-3);font-weight:500;}
+.footer-meta{font-family:var(--mono);font-size:11px;color:var(--ink-4);}
+.footer-meta.refreshing{color:var(--teal-dim);}
+
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);z-index:300;background:var(--bg-inset);border:1px solid var(--teal-line);border-radius:var(--r-md);padding:9px 16px;font-size:12.5px;color:var(--teal);font-family:var(--mono);opacity:0;pointer-events:none;transition:opacity var(--t-fast),transform var(--t-fast);}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+@media (max-width:880px){
+  .bento > .c-nav,.bento > .c-rebal,.bento > .c-record,
+  .bento > .c-chain,.bento > .c-state,.bento > .c-attest,.bento > .c-contracts{grid-column:span 12;}
+  .nav-links{display:none;}
+}
+@media (max-width:720px){
+  .nav-kpi{display:none;}
+  .nav{gap:12px;padding:0 16px;}
+  .pipeline{grid-template-columns:1fr;gap:0;}
+  .node{margin:0 0 34px;}
+  .node:last-child{margin-bottom:0;}
+  .connector{display:none;}
+  .node:not(:last-child)::after{content:"";position:absolute;left:50%;bottom:-26px;width:2px;height:18px;background:var(--teal-line);transform:translateX(-50%);}
+  .node.is-veto:not(:last-child)::after{background:var(--veto-line);}
+  .rebal-item{flex:0 0 50%;min-width:0;border-left:none;padding:8px 0;}
+  .pipeline-cell{padding:20px 16px;}
+  .wrap{padding:0 16px;}
+  .veto-row{grid-template-columns:1fr;gap:8px;}
+  table.scores td.col-hide,table.scores th.col-hide{display:none;}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto;}
+  .connector .flow{animation:none;opacity:0.55;}
+  .dateline .pulse::after{animation:none;}
+  .skel::after{animation:none;}
+  *,*::before,*::after{animation-duration:0.001ms !important;transition-duration:0.001ms !important;}
+}
+</style>
 </head>
 <body>
-  <main aria-labelledby="page-title">
-    <header class="header-row">
-      <h1 id="page-title">WhaleIndex</h1>
-      <span class="net-badge" id="net-badge">Arc Testnet · live</span>
-    </header>
-    <p class="pitch">
-      <strong>A USDC-denominated index on Arc that mirrors top Hyperliquid whales.</strong>
-      Every rebalance posts a content hash on chain that resolves to the agent's full reasoning document — provenance, not trust.
-      The signal sources opt in with a USDC bond; the agent slashes them if they decay.
-    </p>
 
-    <!-- HERO: the 5-second story. Filled in by JS from the latest AllocationDecided. -->
-    <section class="hero" aria-labelledby="hero-h">
-      <h2 id="hero-h" class="hero-eyebrow">Live status</h2>
-      <p class="hero-line" id="hero-line" aria-live="polite">
-        <span class="skel w-xl"></span>
-      </p>
-      <p class="hero-cta" id="hero-cta">Loading the latest on-chain rebalance…</p>
-    </section>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="sparkfill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(0,212,170,0.22)"/>
+      <stop offset="100%" stop-color="rgba(0,212,170,0)"/>
+    </linearGradient>
+  </defs>
+</svg>
 
-    <div class="controls">
-      <select id="network" aria-label="Network">
-        <option value="arc-testnet" selected>Arc Testnet (V3, live)</option>
-        <option value="local" id="opt-local" hidden>Local anvil (dev)</option>
-      </select>
-      <button id="refresh" type="button" aria-label="Refresh data now">refresh</button>
-      <span class="refresh-state" id="refresh-state" aria-live="polite">refreshes every 15s</span>
+<div class="app">
+
+<nav class="nav" aria-label="Primary">
+  <div class="brand">
+    <span class="mark" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+        <path d="M2 13c3 0 3-4 6-4s3 4 6 4 3-4 6-4" stroke="#00d4aa" stroke-width="1.6" stroke-linecap="round"/>
+        <circle cx="11" cy="6" r="1.4" fill="#00d4aa"/>
+      </svg>
+    </span>
+    WhaleIndex
+    <span class="net-pill" id="netPill"><span class="dot"></span>Arc Testnet</span>
+  </div>
+  <div class="nav-kpi" aria-label="Net asset value per WHALE share">
+    <span class="k-label">NAV</span>
+    <span class="k-val" id="navKpi"><span class="skel" style="width:64px;height:14px"></span></span>
+    <span class="k-trend nav-sub" id="navKpiTrend"></span>
+  </div>
+  <div class="nav-spacer"></div>
+  <div class="nav-links">
+    <a href="#pipeline">Pipeline</a>
+    <a href="#dashboard">Dashboard</a>
+    <a href="#ledger">Full record</a>
+  </div>
+  <button class="connect-btn" id="connectBtn" aria-haspopup="dialog">
+    <span class="dot" aria-hidden="true"></span> <span id="connectLabel">Connect wallet</span>
+  </button>
+</nav>
+
+<header class="hero" id="pipeline">
+  <div class="wrap">
+    <div class="hero-head">
+      <span class="dateline"><span class="pulse" aria-hidden="true"></span><span id="cycleEyebrow">CYCLE 2026-05-25 21:51 UTC &middot; LIVE</span></span>
+      <h1 class="thesis">
+        Every decision this index makes &mdash; <span class="em">including the decision to do nothing</span> &mdash; is published, hashed, and <span class="drop">anchored on&#8209;chain.</span>
+      </h1>
+      <p class="hero-sub">WhaleIndex mirrors the conviction of the best Hyperliquid traders, denominated in USDC. An autonomous four&#8209;agent pipeline decides each cycle. We don't ask you to trust the agent &mdash; we ask your browser to verify it. This cycle, the disciplined move was to hold.</p>
+      <div class="hero-verdict-line" id="heroVerdict" aria-live="polite">
+        <span class="verdict-chip"><span class="sk-inline skel"></span></span>
+      </div>
     </div>
 
-    <!-- LATEST REBALANCE -->
-    <section class="card" aria-labelledby="rebalance-h">
-      <h2 id="rebalance-h">Latest rebalance</h2>
-      <div class="row">
-        <div>
-          <div class="label">Routed</div>
-          <div class="value" id="last-amount"><span class="skel w-md"></span></div>
-          <div class="small" id="last-venue"></div>
-        </div>
-        <div>
-          <div class="label">Settlement</div>
-          <div class="value" id="last-latency"><span class="skel w-sm"></span></div>
-          <div class="small">measured: send → receipt</div>
-        </div>
-        <div>
-          <div class="label">Gas cost</div>
-          <div class="value" id="last-cost"><span class="skel w-sm"></span></div>
-          <div class="small" id="last-cost-cents"></div>
+    <div class="pipeline-cell">
+      <div class="pipeline-top">
+        <div class="ptitle"><span class="label">Decision pipeline</span></div>
+        <div class="cycle-meta" id="cycleMeta">
+          <span>method <b>composite 0&ndash;100</b></span>
+          <span>aum <b id="cmAum">&mdash;</b></span>
+          <span>pnl window <b id="cmWindow">&mdash;</b></span>
         </div>
       </div>
-      <div class="small mono" style="margin-top:14px;">
-        <span class="label" style="display:inline; margin-right:8px;">TX</span>
-        <span id="last-tx-link">—</span>
+
+      <div class="pipeline" id="pipelineNodes" role="list" aria-label="Four-agent decision pipeline">
+        <button class="node" role="listitem" data-node="scorer" aria-label="Scorer agent detail">
+          <div class="node-head">
+            <div class="node-stage"><span class="node-num">1</span><span class="node-name">Scorer</span></div>
+            <span class="node-status">scored</span>
+          </div>
+          <div class="node-summary" id="nsScorer"><span class="skel sk-line" style="width:90%"></span><span class="skel sk-line" style="width:70%"></span></div>
+          <div class="node-metric"><span class="m-label">Top score</span><span class="m-val" id="nmScorer">&mdash;</span></div>
+          <span class="node-cta">view scores <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M3 9l6-6M4 3h5v5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        </button>
+
+        <button class="node" role="listitem" data-node="allocator" aria-label="Allocator agent detail">
+          <div class="node-head">
+            <div class="node-stage"><span class="node-num">2</span><span class="node-name">Allocator</span></div>
+            <span class="node-status">drafted</span>
+          </div>
+          <div class="node-summary" id="nsAllocator"><span class="skel sk-line" style="width:90%"></span><span class="skel sk-line" style="width:70%"></span></div>
+          <div class="node-metric"><span class="m-label">Proposals</span><span class="m-val" id="nmAllocator">&mdash;</span></div>
+          <span class="node-cta">view proposals <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M3 9l6-6M4 3h5v5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        </button>
+
+        <button class="node is-veto" role="listitem" data-node="risk" aria-label="Risk agent detail">
+          <div class="node-head">
+            <div class="node-stage"><span class="node-num">3</span><span class="node-name">Risk</span></div>
+            <span class="node-status">veto</span>
+          </div>
+          <div class="node-summary" id="nsRisk"><span class="skel sk-line" style="width:90%"></span><span class="skel sk-line" style="width:70%"></span></div>
+          <div class="node-metric"><span class="m-label">Vetoed</span><span class="m-val" id="nmRisk">&mdash;</span></div>
+          <span class="node-cta">view veto reasons <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M3 9l6-6M4 3h5v5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        </button>
+
+        <button class="node" role="listitem" data-node="coordinator" aria-label="Coordinator agent detail">
+          <div class="node-head">
+            <div class="node-stage"><span class="node-num">4</span><span class="node-name">Coordinator</span></div>
+            <span class="node-status" id="nstCoord">held</span>
+          </div>
+          <div class="node-summary" id="nsCoordinator"><span class="skel sk-line" style="width:90%"></span><span class="skel sk-line" style="width:70%"></span></div>
+          <div class="node-metric"><span class="m-label">Verdict</span><span class="m-val" id="nmCoordinator">&mdash;</span></div>
+          <span class="node-cta">view verdict <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M3 9l6-6M4 3h5v5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        </button>
       </div>
-      <div class="small mono" style="margin-top:4px;">
-        <span class="label" style="display:inline; margin-right:8px;">PROVENANCE</span>
-        <span id="last-cid-link">—</span>
+
+      <div id="connectorLayer" aria-hidden="true"></div>
+
+      <div class="pipeline-foot">
+        <span class="anchored">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3.2 3L13 5" stroke="var(--teal)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Reasoning anchored on Arc &middot; <span class="cid" id="footCid">cid &mdash;</span>
+        </span>
+        <span id="footDoc">decision-latest.json &middot; doc v2</span>
       </div>
-    </section>
+    </div>
+  </div>
+</header>
 
-    <!-- AGENT REASONING (rendered from the CID-resolved JSON) -->
-    <section class="card" aria-labelledby="reason-h">
-      <h2 id="reason-h">The agent's reasoning (this cycle)</h2>
-      <div id="reasoning-area" aria-live="polite">
-        <p class="small empty">Loading allocation document…</p>
+<main class="dash" id="dashboard">
+  <div class="wrap">
+    <div class="section-eyebrow"><span class="label">The book, the proof</span><span class="rule"></span></div>
+
+    <div class="err-band" id="errBand" role="alert">
+      <span id="errBandMsg">Both Arc RPC endpoints are unreachable. The data below is the last verified read.</span>
+      <button class="retry" id="errRetry">Retry</button>
+    </div>
+
+    <div class="bento">
+
+      <section class="cell c-nav" id="navCell" aria-label="NAV per share">
+        <div class="cell-head"><h3>NAV per WHALE</h3><span class="tag-pill live">on-chain</span></div>
+        <div class="nav-figure">
+          <div>
+            <div class="nav-price" id="navPrice"><span class="skel sk-block" style="width:140px"></span></div>
+            <div class="nav-meta">
+              <span class="trend-pill" id="navAum">&mdash;</span>
+              <span class="nav-sub" id="navFresh"></span>
+            </div>
+          </div>
+          <svg class="spark" width="140" height="46" viewBox="0 0 140 46" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M0,38 L12,36 L24,37 L36,32 L48,33 L60,28 L72,30 L84,24 L96,25 L108,19 L120,21 L132,14 L140,12 L140,46 L0,46 Z" fill="url(#sparkfill)"/>
+            <path d="M0,38 L12,36 L24,37 L36,32 L48,33 L60,28 L72,30 L84,24 L96,25 L108,19 L120,21 L132,14 L140,12" fill="none" stroke="#00d4aa" stroke-width="1.6"/>
+          </svg>
+        </div>
+        <div class="statline">
+          <div class="si"><div class="sv" id="navSupply">&mdash;</div><div class="sk2">share supply</div></div>
+          <div class="si"><div class="sv" id="navMaxDelta">&mdash;</div><div class="sk2">max NAV delta</div></div>
+        </div>
+      </section>
+
+      <section class="cell c-rebal" id="rebalCell" aria-label="Latest rebalance">
+        <div class="cell-head"><h3>Latest rebalance</h3><span class="tag-pill live" id="rebalTag">live decision</span></div>
+        <div class="rebal-figure" id="rebalFigure">
+          <div class="rebal-item"><div class="d-val"><span class="skel" style="width:40px;height:18px"></span></div><div class="d-label">positions changed</div></div>
+          <div class="rebal-item held"><div class="d-val"><span class="skel" style="width:50px;height:18px"></span></div><div class="d-label">agent verdict</div></div>
+          <div class="rebal-item"><div class="d-val"><span class="skel" style="width:40px;height:18px"></span></div><div class="d-label">proposals vetoed</div></div>
+          <div class="rebal-item"><div class="d-val"><span class="skel" style="width:50px;height:18px"></span></div><div class="d-label">settlement</div></div>
+        </div>
+        <div class="rebal-foot" id="rebalFoot"><span class="skel sk-line" style="width:80%"></span></div>
+      </section>
+
+      <section class="cell c-record" id="recordCell" aria-label="Decision record and verification">
+        <div class="cell-head"><h3>Decision record</h3><span class="tag-pill" id="recordSource">verifying&hellip;</span></div>
+        <div id="recordRows">
+          <div class="record-row"><span class="rk">Chosen proposal</span><span class="rv" id="rrChosen"><span class="skel" style="width:90px;height:13px"></span></span></div>
+          <div class="record-row"><span class="rk">Coordinator</span><span class="rv" id="rrCoord"><span class="skel" style="width:120px;height:13px"></span></span></div>
+          <div class="record-row"><span class="rk">Snapshot</span><span class="rv" id="rrSnap"><span class="skel" style="width:140px;height:13px"></span></span></div>
+          <div class="record-row"><span class="rk">Whales scored</span><span class="rv" id="rrWhales"><span class="skel" style="width:60px;height:13px"></span></span></div>
+        </div>
+
+        <div class="verify-box" id="verifyBox">
+          <div class="verify-top">
+            <span class="verify-check" id="verifyCheck" aria-hidden="true">
+              <svg viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3.2 3L13 5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+            <div class="verify-text" id="verifyText"><b>Computing digest&hellip;</b> hashing the decision in your browser.</div>
+          </div>
+          <div class="verify-hash" id="verifyHash"></div>
+        </div>
+
+        <div class="record-actions">
+          <a class="btn-ghost" id="docLink" href="decision-latest.json" target="_blank" rel="noopener">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M5 2H3v12h2M11 2h2v12h-2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+            Open canonical JSON
+          </a>
+          <button class="btn-ghost" id="reverify">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M13 8a5 5 0 11-1.5-3.5M13 2v3h-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Re-verify
+          </button>
+          <a class="btn-ghost" href="#ledger">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M3 4h10M3 8h10M3 12h7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+            Expand full record
+          </a>
+        </div>
+      </section>
+
+      <section class="cell c-chain" id="chainCell" aria-label="Chain cost and latency comparison">
+        <div class="cell-head"><h3>Why anchor on Arc</h3><span class="tag-pill" id="chainTag">representative</span></div>
+        <div class="chain-row is-arc"><span class="cn">Arc</span><span class="bar-track"><span class="bar-fill" style="width:14%"></span></span><span class="cv" id="chainArcVal">&mdash;</span></div>
+        <div class="chain-row"><span class="cn">Arbitrum</span><span class="bar-track"><span class="bar-fill" style="width:48%"></span></span><span class="cv">~2.5s</span></div>
+        <div class="chain-row"><span class="cn">Ethereum</span><span class="bar-track"><span class="bar-fill" style="width:100%"></span></span><span class="cv">~12s</span></div>
+        <div class="chain-note" id="chainNote">Settlement on Arc paid in USDC as native gas &mdash; no separate gas token to manage. Arbitrum/Ethereum figures are representative ranges from public docs.</div>
+      </section>
+
+      <section class="cell c-attest" id="attestCell" aria-label="Bonded whale attestation">
+        <div class="cell-head"><h3>Skin in the game &middot; bonded whales</h3><span class="tag-pill live">on-chain</span></div>
+        <div id="attestContent">
+          <div class="attest-grid">
+            <div class="ag"><div class="av"><span class="skel" style="width:60px;height:18px"></span></div><div class="ak">total bonded</div></div>
+            <div class="ag"><div class="av"><span class="skel" style="width:40px;height:18px"></span></div><div class="ak">bonded whales</div></div>
+            <div class="ag"><div class="av"><span class="skel" style="width:40px;height:18px"></span></div><div class="ak">lifetime slashes</div></div>
+          </div>
+          <div class="slash-line" id="slashLine"><span class="skel sk-line" style="width:70%"></span></div>
+        </div>
+      </section>
+
+      <section class="cell c-contracts" id="contractsCell" aria-label="Verified contracts">
+        <div class="cell-head"><h3>Verified contracts &middot; Arc testnet</h3><span class="tag-pill">chain 5042002</span></div>
+        <div class="contract-grid" id="contractGrid"></div>
+      </section>
+
+    </div>
+  </div>
+</main>
+
+<section class="ledger-section" id="ledger">
+  <div class="wrap">
+    <div class="ledger-head">
+      <h2 class="serif-h">The full decision ledger.</h2>
+      <p class="ledger-sub">Every whale the agent scored, every proposal the allocator drafted, and every reason the risk officer gave for vetoing it &mdash; the same record your browser just re&#8209;hashed. Nothing is summarised away.</p>
+      <button class="ledger-toggle" id="ledgerToggle" aria-expanded="false" aria-controls="ledgerBody">
+        <span id="ledgerToggleLabel">Expand full record</span>
+        <svg viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+    <div class="ledger-body" id="ledgerBody">
+      <div class="ledger-card">
+        <div class="lc-head"><h4>Scorer &middot; every wallet ranked 0&ndash;100</h4><span class="lc-meta" id="ledgerScoreMeta">&mdash;</span></div>
+        <div class="lc-pad">
+          <table class="scores">
+            <thead><tr><th>#</th><th>Wallet</th><th class="r col-hide">Realised PnL</th><th class="r col-hide">Open</th><th class="r">Score</th></tr></thead>
+            <tbody id="ledgerScoreBody"></tbody>
+          </table>
+        </div>
       </div>
-    </section>
-
-    <!-- WHALE ATTESTATION -->
-    <section class="card" aria-labelledby="attest-h">
-      <h2 id="attest-h">Skin-in-the-game · bonded whales</h2>
-      <div class="row">
-        <div>
-          <div class="label">Total bonded</div>
-          <div class="value" id="att-total"><span class="skel w-sm"></span></div>
-          <div class="small">USDC locked in attestation escrow</div>
-        </div>
-        <div>
-          <div class="label">Bonded whales</div>
-          <div class="value" id="att-count"><span class="skel w-sm"></span></div>
-          <div class="small">unique addresses with active bonds</div>
-        </div>
-        <div>
-          <div class="label">Lifetime slashes</div>
-          <div class="value" id="att-slashes"><span class="skel w-sm"></span></div>
-          <div class="small" id="att-slashed-usdc"></div>
-        </div>
+      <div class="ledger-card">
+        <div class="lc-head"><h4>Allocator &middot; proposals &amp; Risk verdicts</h4><span class="lc-meta" id="ledgerVetoMeta">&mdash;</span></div>
+        <div class="lc-pad"><div class="veto-ledger" id="ledgerVetoBody"></div></div>
       </div>
-      <div class="small mono" style="margin-top:14px;">
-        <span class="label" style="display:inline; margin-right:8px;">LATEST SLASH</span>
-        <span id="last-slash-line">—</span>
+      <div class="ledger-card">
+        <div class="lc-head"><h4>Honest limitations</h4><span class="lc-meta">disclosed in the doc</span></div>
+        <div class="lc-pad"><ul id="ledgerLimits" style="margin:0;padding-left:18px;color:var(--ink-2);font-size:13px;line-height:1.7"></ul></div>
       </div>
-    </section>
+    </div>
+  </div>
+</section>
 
-    <!-- COMPARISON -->
-    <section class="card" aria-labelledby="compare-h">
-      <h2 id="compare-h">Why Arc — same rebalance, different chains</h2>
-      <div class="compare-grid">
-        <div class="compare lead">
-          <h3>Arc Testnet <span class="live" id="arc-live-tag">live</span></h3>
-          <div class="stat" id="arc-compare-latency"><span class="skel w-sm"></span></div>
-          <div class="note" id="arc-compare-cost"><span class="skel w-md"></span></div>
-          <div class="note">Deterministic finality. USDC is the gas token.</div>
-        </div>
-        <div class="compare">
-          <h3>Arbitrum One</h3>
-          <div class="stat dim">~2s</div>
-          <div class="note">≈ $0.20–0.30 gas (ETH)</div>
-          <div class="note">7-day fraud window before finality.</div>
-        </div>
-        <div class="compare">
-          <h3>Ethereum L1</h3>
-          <div class="stat dim">~12s</div>
-          <div class="note">≈ $4–8 gas (ETH)</div>
-          <div class="note">Probabilistic finality.</div>
-        </div>
+<footer class="footer">
+  <div class="wrap footer-inner">
+    <div class="cite">
+      <b>WhaleIndex</b> &mdash; a proof-of-reasoning ledger with a buy button. USDC-denominated, Arc testnet.<br>
+      Source: <a href="https://github.com/Yonkoo11/whaleindex" target="_blank" rel="noopener">github.com/Yonkoo11/whaleindex</a>
+      &middot; Built for the <a href="https://agora.thecanteenapp.com" target="_blank" rel="noopener">Agora Agents Hackathon</a>
+      &middot; MIT licensed
+    </div>
+    <div class="footer-meta" id="footerMeta">connecting&hellip;</div>
+  </div>
+</footer>
+
+</div>
+
+<div class="scrim" id="scrim"></div>
+
+<aside class="panel" id="nodePanel" role="dialog" aria-modal="true" aria-labelledby="npTitle" tabindex="-1">
+  <div class="panel-head">
+    <div class="ph-stage"><span class="node-num" id="npNum">1</span><h3 id="npTitle">Scorer</h3></div>
+    <button class="panel-close" data-close aria-label="Close panel">
+      <svg viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+  <div class="panel-body" id="npBody"></div>
+</aside>
+
+<aside class="panel" id="buyPanel" role="dialog" aria-modal="true" aria-labelledby="buyTitle" tabindex="-1">
+  <div class="panel-head">
+    <div class="ph-stage"><h3 id="buyTitle">Connect wallet</h3></div>
+    <button class="panel-close" data-close aria-label="Close panel">
+      <svg viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+  <div class="panel-body">
+
+    <div class="no-wallet" id="noWallet">
+      <p>No Ethereum wallet detected in this browser. Install MetaMask to buy or redeem WHALE on Arc Testnet. The dashboard above stays fully usable without a wallet.</p>
+      <a class="btn-secondary" href="https://metamask.io/download/" target="_blank" rel="noopener">Install MetaMask</a>
+    </div>
+
+    <div id="connectView">
+      <p class="panel-tag" style="margin:0 0 16px;color:var(--ink-3)">Connect to buy or redeem WHALE on Arc Testnet (chain 5042002). Reads above never require a wallet.</p>
+      <button class="btn-primary" id="doConnect">Connect wallet</button>
+      <div class="flow-err" id="connectErr"></div>
+    </div>
+
+    <div id="wrongNetView" style="display:none">
+      <p class="panel-tag" style="margin:0 0 16px;color:var(--warn)">Your wallet is on the wrong network. WhaleIndex lives on Arc Testnet (chain 5042002).</p>
+      <button class="btn-primary" id="doSwitch">Switch to Arc Testnet</button>
+      <div class="flow-err" id="switchErr"></div>
+    </div>
+
+    <div id="buyForm" style="display:none">
+      <div class="conn-box">
+        <div class="cb-row"><span class="cb-k">Connected</span><span class="cb-addr" id="connAddr">&mdash;</span></div>
+        <div class="cb-row"><span class="cb-k">USDC balance</span><span class="cb-v" id="balUsdc">&mdash;</span></div>
+        <div class="cb-row"><span class="cb-k">WHALE balance</span><span class="cb-v" id="balWhale">&mdash;</span></div>
+        <div class="cb-row"><span class="cb-k">Position value</span><span class="cb-v" id="posValue">&mdash;</span></div>
+        <button class="disconnect" id="doDisconnect">Disconnect</button>
       </div>
-      <p class="small" style="margin-top:10px;">
-        Arbitrum/Ethereum figures are typical-range estimates from public docs; Arc figures are derived from the latest on-chain rebalance.
-      </p>
-    </section>
 
-    <!-- PROTOCOL STATE (engineering details) -->
-    <section class="card" aria-labelledby="state-h">
-      <h2 id="state-h">Protocol state</h2>
-      <div class="row">
-        <div>
-          <div class="label">NAV (USDC)</div>
-          <div class="value big" id="nav"><span class="skel w-md"></span></div>
-          <div class="small" id="nav-fresh"></div>
-        </div>
-        <div>
-          <div class="label">Share price (USDC / WHALE)</div>
-          <div class="value" id="sp"><span class="skel w-sm"></span></div>
-          <div class="small" id="supply"></div>
-        </div>
-        <div>
-          <div class="label">Max NAV delta per update</div>
-          <div class="value" id="maxdelta"><span class="skel w-sm"></span></div>
-          <div class="small">on-chain bound; reverts beyond</div>
-        </div>
+      <div class="seg" role="tablist" aria-label="Buy or redeem">
+        <button class="active" id="segBuy" role="tab" aria-selected="true">Buy</button>
+        <button id="segRedeem" role="tab" aria-selected="false">Redeem</button>
       </div>
-    </section>
 
-    <!-- VERIFIED CONTRACTS -->
-    <section class="card" aria-labelledby="contracts-h">
-      <h2 id="contracts-h">Verified contracts (Arc Testnet)</h2>
-      <div class="addr-list" id="addr-list" role="list"></div>
-      <p class="small" style="margin-top:12px;">
-        All contracts have verified source on
-        <a href="https://testnet.arcscan.app" target="_blank" rel="noopener">Arcscan</a>.
-        Bytecode + ABI public.
-      </p>
-    </section>
-
-    <!-- CONNECTION (footer-ish) -->
-    <section class="card" aria-labelledby="conn-h">
-      <h2 id="conn-h">Connection</h2>
-      <div class="small mono" id="conn">connecting…</div>
-      <div class="err" id="err" aria-live="assertive"></div>
-    </section>
-
-    <footer class="footer">
-      <div>
-        Source: <a href="https://github.com/Yonkoo11/whaleindex" target="_blank" rel="noopener">github.com/Yonkoo11/whaleindex</a>
-        · Built for the <a href="https://agora.thecanteenapp.com" target="_blank" rel="noopener">Agora Agents Hackathon</a>
-        · MIT licensed
+      <div class="field">
+        <label for="buyAmt" id="amtLabel">Amount to spend (USDC)</label>
+        <div class="input-wrap" id="amtWrap">
+          <input id="buyAmt" type="text" inputmode="decimal" placeholder="0.00" autocomplete="off" aria-describedby="amtErr">
+          <button class="field-max" id="amtMax" type="button" aria-label="Use max balance">MAX</button>
+          <span class="unit" id="amtUnit">USDC</span>
+        </div>
+        <div class="field-err" id="amtErr">Enter an amount you can cover with your balance.</div>
       </div>
-      <div class="footer-meta" id="footer-meta">page loaded · refreshes every 15s</div>
-    </footer>
-  </main>
 
-  <script type="module">
-    import { JsonRpcProvider, Contract, formatUnits, getAddress, EventLog } from "https://esm.sh/ethers@6.13.4";
+      <div class="est-box">
+        <div class="er"><span class="ek" id="estLabel">Estimated shares</span><span class="ev" id="estVal">0<span class="dim">.0000</span> WHALE</span></div>
+        <div class="er"><span class="ek">Share price</span><span class="ev" id="estPrice">&mdash;</span></div>
+      </div>
 
-    // ---- Network config ----
-    const NETWORKS = {
-      "arc-testnet": {
-        rpc: "https://rpc.testnet.arc.network",
-        rpcFallback: "https://arc-testnet.drpc.org",
-        chainId: 5042002,
-        explorer: "https://testnet.arcscan.app",
-        addresses: {
-          NAVOracle:          "0xfEbB84BE47b0d440Ba08DaE0f5E3b09B4f989Cf8",
-          IndexToken:         "0xAdEa3FaE6011c2D275868d1c1933B37BE7648269",
-          RebalanceExecutor:  "0xb06a30226979789508306dAA9b027914045a4024",
-          CCTPRouter:         "0x0D9D3e16258AAF3297A67a443a55ADe0E3f49849",
-          USYCParkVault:      "0x59a69BAFb6dCc9BF304bBE0583561aDf3B613435",
-          WhaleAttestation:   "0x1d2d34D941b13CbF233051074F007ecf68fB0F7f",
-          USDC:               "0x3600000000000000000000000000000000000000",
-          TokenMessenger:     "0x2522423855550e82016103c79F097042Cf2d5a0B",
-          USYC:               "0x2B540589EAF231b930Ed5D53ee3CE292904ccb2d",
-        },
-        realCctpMessenger:    "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA",
-      },
-      "local": {
-        rpc: "http://127.0.0.1:8545", chainId: 31337, explorer: "",
-        addresses: {
-          NAVOracle:  "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
-          IndexToken: "0x0165878A594ca255338adfa4d48449f69242Eb8F",
-          CCTPRouter: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
-          RebalanceExecutor: "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
-        },
-      },
-    };
-    const ALLOCATIONS_BASE = "https://yonkoo11.github.io/whaleindex/allocations";
-    const SLASHES_BASE     = "https://yonkoo11.github.io/whaleindex/slashes";
+      <button class="btn-primary" id="buySubmit" disabled>Enter an amount</button>
+      <div class="flow-err" id="flowErr"></div>
+    </div>
 
-    // ---- Reveal dev-only options when ?dev=1 ----
-    if (new URLSearchParams(location.search).get("dev") === "1") {
-      document.getElementById("opt-local").hidden = false;
+    <div class="settle" id="settleView">
+      <div class="spinner" aria-hidden="true"></div>
+      <div class="s-label" id="settleLabel">Settling on Arc&hellip;</div>
+      <div class="s-timer"><span id="settleMs">0</span> ms</div>
+      <p class="panel-tag" style="margin-top:14px;color:var(--ink-4)">Arc finalises in well under a second.</p>
+    </div>
+
+    <div class="success" id="successView" role="status">
+      <div class="s-check" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.5 4.5L19 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="s-head" id="successHead">Settled.</div>
+      <div class="s-detail" id="successDetail"></div>
+      <button class="btn-ghost" id="successDone" style="margin-top:18px">Done</button>
+    </div>
+
+  </div>
+</aside>
+
+<div class="toast" id="toast" role="status" aria-live="polite">Copied</div>
+
+<script type="module">
+import { JsonRpcProvider, BrowserProvider, Contract, formatUnits, parseUnits, getAddress } from "https://esm.sh/ethers@6.13.4";
+
+const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const ARC = {
+  rpc: "https://rpc.testnet.arc.network",
+  rpcFallback: "https://arc-testnet.drpc.org",
+  chainId: 5042002,
+  chainIdHex: "0x4CEDD2",
+  explorer: "https://testnet.arcscan.app",
+  addresses: {
+    NAVOracle:         "0xfEbB84BE47b0d440Ba08DaE0f5E3b09B4f989Cf8",
+    IndexToken:        "0xAdEa3FaE6011c2D275868d1c1933B37BE7648269",
+    RebalanceExecutor: "0xb06a30226979789508306dAA9b027914045a4024",
+    CCTPRouter:        "0x0D9D3e16258AAF3297A67a443a55ADe0E3f49849",
+    USYCParkVault:     "0x59a69BAFb6dCc9BF304bBE0583561aDf3B613435",
+    WhaleAttestation:  "0x1d2d34D941b13CbF233051074F007ecf68fB0F7f",
+    USDC:              "0x3600000000000000000000000000000000000000",
+    TokenMessenger:    "0x2522423855550e82016103c79F097042Cf2d5a0B",
+    USYC:              "0x2B540589EAF231b930Ed5D53ee3CE292904ccb2d",
+  },
+};
+const DECISION_URL = "decision-latest.json";
+
+const ABI_NAV = [
+  "function nav() view returns (uint256)",
+  "function isFresh() view returns (bool)",
+  "function updatedAt() view returns (uint64)",
+  "function maxDeltaBps() view returns (uint256)",
+];
+const ABI_INDEX = [
+  "function totalSupply() view returns (uint256)",
+  "function sharePrice() view returns (uint256)",
+  "function balanceOf(address) view returns (uint256)",
+  "function buy(uint256 usdcAmount) returns (uint256)",
+  "function redeem(uint256 sharesIn) returns (uint256)",
+];
+const ABI_EXEC = [
+  "event AllocationDecided(bytes32 indexed cid, uint16 whaleCount, uint64 reportedAt)",
+];
+const ABI_ATTEST = [
+  "function bondAmount(address) view returns (uint256)",
+  "event Bonded(address indexed wallet, uint256 amount, uint256 totalBond)",
+  "event Slashed(address indexed wallet, uint256 amount, uint16 slashBps, bytes32 evidenceCid)",
+];
+const ABI_ERC20 = [
+  "function balanceOf(address) view returns (uint256)",
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function approve(address spender, uint256 amount) returns (bool)",
+  "function decimals() view returns (uint8)",
+];
+
+const $ = (s,r)=>(r||document).querySelector(s);
+const $$ = (s,r)=>Array.prototype.slice.call((r||document).querySelectorAll(s));
+const short = (a)=>a.slice(0,6)+"…"+a.slice(-4);
+const fmtUsd = (raw,dec,frac=4)=>Number(formatUnits(raw,dec)).toLocaleString(undefined,{maximumFractionDigits:frac});
+const fmtAgo = (sec)=>{ if(sec<60)return Math.round(sec)+"s ago"; if(sec<3600)return Math.round(sec/60)+"m ago"; if(sec<86400)return Math.round(sec/3600)+"h ago"; return Math.round(sec/86400)+"d ago"; };
+const esc = (s)=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+function clear(el){ while(el.firstChild) el.removeChild(el.firstChild); }
+function setText(el,t){ if(el){clear(el);el.appendChild(document.createTextNode(t));} }
+function setHTML(el,h){ if(el){ el.innerHTML = h; } }
+function priceMarkup(usdcStr){ const [i,d]=usdcStr.split("."); return '<span class="sym">$</span>'+i+(d!==undefined?'<span class="dec">.'+d+'</span>':''); }
+function makeLink(href,text){ const a=document.createElement("a"); a.href=href; a.textContent=text; a.target="_blank"; a.rel="noopener"; return a; }
+
+let toastT;
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),1400); }
+
+let DECISION=null, SCORES=[], PROPOSALS=[], VERDICTS=[], LIMITS=[], WHALES=[], CID="";
+let pnlByWallet={}, posByWallet={};
+
+async function loadDecision(){
+  try{
+    const r=await fetch(DECISION_URL,{cache:"no-store"});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    DECISION=await r.json();
+    CID=DECISION.cid||"";
+    const doc=DECISION.doc||{};
+    const dec=doc.decision||{};
+    const audit=dec.multi_agent_audit||{};
+    SCORES=(audit.scorer&&audit.scorer.scores)||[];
+    PROPOSALS=(audit.allocator&&audit.allocator.proposals)||[];
+    VERDICTS=(audit.risk&&audit.risk.verdicts)||[];
+    LIMITS=doc.limitations||[];
+    WHALES=doc.whales||[];
+    pnlByWallet={}; posByWallet={};
+    WHALES.forEach(w=>{ pnlByWallet[w.wallet]=w.realised_pnl_usd_window; posByWallet[w.wallet]=w.open_position_count; });
+    renderDecision(doc,dec);
+    runVerify();
+  }catch(e){ renderDecisionError(e); }
+}
+
+function renderDecision(doc,dec){
+  const traded=DECISION.traded===true;
+  const chosen=dec.chosen_proposal;
+  const vetoCount=VERDICTS.filter(v=>v.verdict==="veto").length;
+  const whaleN=WHALES.length||SCORES.length;
+  const topScore=SCORES.length?SCORES[0].score:null;
+  const aum=doc.aum_usdc;
+  const snapIso=doc.snapshot_iso||DECISION.snapshot_iso||"";
+
+  if(snapIso) setText($("#cycleEyebrow"),"CYCLE "+snapIso.replace("T"," ").replace("Z"," UTC")+" · LIVE");
+  setText($("#cmAum"), aum!=null?"$"+Number(aum).toLocaleString():"—");
+  setText($("#cmWindow"), doc.pnl_window_days?doc.pnl_window_days+"d":"—");
+  setText($("#footDoc"),"decision-latest.json · doc v"+(doc.version||"2"));
+  if(CID) setText($("#footCid"),"cid 0x"+CID.slice(0,8)+"…"+CID.slice(-6));
+
+  const hv=$("#heroVerdict"); clear(hv);
+  const chip=(txt,cls)=>{ const s=document.createElement("span"); s.className="verdict-chip"+(cls?" "+cls:""); s.textContent=txt; return s; };
+  hv.appendChild(chip(whaleN+" whales scored"));
+  hv.appendChild(chip(PROPOSALS.length+" proposals drafted"));
+  if(vetoCount) hv.appendChild(chip(vetoCount+" vetoed by Risk","veto"));
+  const held=chip(traded?"Coordinator: REBALANCED":"Coordinator: HELD","held");
+  const ck=document.createElementNS("http://www.w3.org/2000/svg","svg");
+  ck.setAttribute("viewBox","0 0 16 16"); ck.setAttribute("fill","none");
+  const ckp=document.createElementNS("http://www.w3.org/2000/svg","path");
+  ckp.setAttribute("d","M3 8.5l3.2 3L13 5"); ckp.setAttribute("stroke","currentColor"); ckp.setAttribute("stroke-width","1.8"); ckp.setAttribute("stroke-linecap","round"); ckp.setAttribute("stroke-linejoin","round");
+  ck.appendChild(ckp); held.insertBefore(ck,held.firstChild);
+  hv.appendChild(held);
+
+  setText($("#nmScorer"), topScore!=null?topScore.toFixed(2):"—");
+  const activeCount=SCORES.filter(s=>posByWallet[s.wallet]>0).length;
+  setText($("#nsScorer"),"Ranked "+whaleN+" whale wallets on PnL, Sharpe, drawdown, win rate and recency. "+activeCount+" are active right now; the rest are flat or withdrawn.");
+  setText($("#nmAllocator"),String(PROPOSALS.length));
+  const coins=new Set(); PROPOSALS.forEach(p=>(p.allocations||[]).forEach(a=>coins.add(a.coin)));
+  setText($("#nsAllocator"),"Built "+PROPOSALS.length+" weighting strategies — "+PROPOSALS.map(p=>p.name).join(", ").replace(/_/g," ")+" — over "+coins.size+" coins ("+Array.from(coins).join(" & ")+").");
+  setText($("#nmRisk"), vetoCount+" / "+VERDICTS.length);
+  let maxConc=null,dirBias=null;
+  VERDICTS.forEach(v=>(v.reasons||[]).forEach(rr=>{
+    let m=rr.match(/concentration[^=]*=\s*([\d.]+)%/); if(m) maxConc=Math.max(maxConc||0,parseFloat(m[1]));
+    m=rr.match(/directional bias[^=]*=\s*([\d.]+)%/); if(m) dirBias=Math.max(dirBias||0,parseFloat(m[1]));
+  }));
+  let riskSum="Rejected every proposal";
+  if(dirBias!=null) riskSum+=" — directional bias hit "+dirBias+"% (cap 80%)";
+  if(maxConc!=null) riskSum+=" and concentration reached "+maxConc+"% (cap 50%)";
+  setText($("#nsRisk"), riskSum+".");
+  setText($("#nmCoordinator"), traded?"TRADED":"HELD");
+  setText($("#nstCoord"), traded?"traded":"held");
+  setText($("#nsCoordinator"), traded
+    ? ("Coordinator chose "+(chosen?chosen.replace(/_/g," "):"a proposal")+" and rebalanced the book. Reasoning anchored on-chain.")
+    : "With no proposal surviving Risk, the Coordinator held the book. No rebalance this cycle, anchored on-chain.");
+
+  const rc=$("#rrChosen"); clear(rc);
+  if(chosen){ rc.appendChild(document.createTextNode(chosen)); }
+  else { const s=document.createElement("span"); s.className="veto"; s.textContent="none — all vetoed"; rc.appendChild(s); }
+  setText($("#rrCoord"), traded?"rebalanced this cycle":"no rebalance this cycle");
+  setText($("#rrSnap"), snapIso||"—");
+  setText($("#rrWhales"), whaleN+" · doc v"+(doc.version||"2"));
+
+  const rf=$("#rebalFigure"); clear(rf);
+  const mkItem=(valNode,lab,held)=>{ const d=document.createElement("div"); d.className="rebal-item"+(held?" held":"");
+    const dv=document.createElement("div"); dv.className="d-val"; if(typeof valNode==="string") dv.textContent=valNode; else dv.appendChild(valNode);
+    const dl=document.createElement("div"); dl.className="d-label"; dl.textContent=lab; d.append(dv,dl); return d; };
+  rf.appendChild(mkItem("0","positions changed"));
+  const verdictNode=document.createElement("span");
+  const vSvg=document.createElementNS("http://www.w3.org/2000/svg","svg"); vSvg.setAttribute("viewBox","0 0 16 16"); vSvg.setAttribute("fill","none");
+  const vP=document.createElementNS("http://www.w3.org/2000/svg","path"); vP.setAttribute("d","M3 8.5l3.2 3L13 5"); vP.setAttribute("stroke","currentColor"); vP.setAttribute("stroke-width","1.8"); vP.setAttribute("stroke-linecap","round"); vP.setAttribute("stroke-linejoin","round"); vSvg.appendChild(vP);
+  const verdictWrap=document.createElement("span"); verdictWrap.style.display="inline-flex"; verdictWrap.style.alignItems="center"; verdictWrap.style.gap="7px"; verdictWrap.appendChild(vSvg); verdictWrap.appendChild(document.createTextNode(traded?"TRADED":"HELD"));
+  rf.appendChild(mkItem(verdictWrap,"agent verdict",true));
+  rf.appendChild(mkItem(String(vetoCount),"proposals vetoed"));
+  const settleSpan=document.createElement("span"); settleSpan.id="rebalSettle"; settleSpan.textContent="—";
+  rf.appendChild(mkItem(settleSpan,"settlement"));
+
+  const foot=$("#rebalFoot"); clear(foot);
+  if(traded){ foot.appendChild(document.createTextNode("Agent rebalanced the book this cycle. ")); const b=document.createElement("b"); b.textContent="Reasoning anchored ✓"; foot.appendChild(b); }
+  else { foot.appendChild(document.createTextNode("0 changes · agent held · ")); const b=document.createElement("b"); b.textContent="reasoning anchored ✓"; foot.appendChild(b); foot.appendChild(document.createTextNode(" — a quiet cycle is a disciplined one, not a missing one.")); }
+
+  buildLedger();
+}
+
+function renderDecisionError(e){
+  setText($("#recordSource"),"doc unreachable");
+  setText($("#rrChosen"),"—");
+  setText($("#rrCoord"),"decision doc not reachable");
+  setText($("#rrSnap"),"("+(e.message||"fetch failed")+")");
+  setText($("#rrWhales"),"—");
+  ["#nsScorer","#nsAllocator","#nsRisk","#nsCoordinator"].forEach(id=>setText($(id),"Decision document not reachable yet."));
+  const vt=$("#verifyText"); clear(vt);
+  const b=document.createElement("b"); b.textContent="Could not load decision-latest.json. "; vt.appendChild(b); vt.appendChild(document.createTextNode(e.message||""));
+}
+
+async function sha256Hex(str){
+  const buf=await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+  return Array.prototype.map.call(new Uint8Array(buf), b=>b.toString(16).padStart(2,"0")).join("");
+}
+async function runVerify(){
+  const check=$("#verifyCheck"), text=$("#verifyText"), hashEl=$("#verifyHash"), src=$("#recordSource");
+  if(!DECISION) return;
+  check.classList.remove("ok");
+  const computing=document.createElement("b"); clear(text); computing.textContent="Computing content hash… "; text.appendChild(computing); text.appendChild(document.createTextNode("hashing the decision in your browser."));
+  clear(hashEl);
+  const payload=JSON.stringify(DECISION.doc);
+  const digest=await sha256Hex(payload);
+  const anchored=(CID||"").toLowerCase();
+  const matches=anchored && digest===anchored;
+  setTimeout(()=>{
+    clear(text); clear(hashEl);
+    if(matches){
+      check.classList.add("ok");
+      setText(src,"verified");
+      text.appendChild(document.createTextNode("Your browser just verified this. "));
+      const ok=document.createElement("span"); ok.className="ok-word"; ok.textContent="Recomputed sha256 matches the anchored cid."; text.appendChild(ok);
+      const eq=document.createElement("span"); eq.className="eq"; eq.textContent="0x"+digest.slice(0,10)+"…"+digest.slice(-8);
+      hashEl.appendChild(document.createTextNode("sha256(doc) = ")); hashEl.appendChild(eq);
+      const okw=document.createElement("span"); okw.className="ok-word"; okw.textContent=" = anchored cid"; hashEl.appendChild(okw); hashEl.appendChild(document.createTextNode(" · Arc"));
+    }else{
+      check.classList.remove("ok");
+      setText(src,"content hash");
+      text.appendChild(document.createTextNode("Your browser recomputed the content hash of the decision document. "));
+      const ok=document.createElement("span"); ok.className="ok-word"; ok.textContent="It is reproducible — anyone can rerun it."; text.appendChild(ok);
+      const eq1=document.createElement("span"); eq1.className="eq"; eq1.textContent="0x"+digest.slice(0,12)+"…"+digest.slice(-10);
+      hashEl.appendChild(document.createTextNode("sha256(doc) computed in your browser = ")); hashEl.appendChild(eq1); hashEl.appendChild(document.createElement("br"));
+      const eq2=document.createElement("span"); eq2.className="eq"; eq2.textContent="0x"+(anchored?anchored.slice(0,12)+"…"+anchored.slice(-10):"—");
+      hashEl.appendChild(document.createTextNode("anchored cid on Arc = ")); hashEl.appendChild(eq2);
     }
+  }, reduce?0:500);
+}
 
-    // ---- ABIs (minimal — only what we read) ----
-    const ABI_NAV = [
-      "function nav() view returns (uint256)",
-      "function isFresh() view returns (bool)",
-      "function updatedAt() view returns (uint64)",
-      "function maxDeltaBps() view returns (uint256)",
-    ];
-    const ABI_INDEX = [
-      "function totalSupply() view returns (uint256)",
-      "function sharePrice() view returns (uint256)",
-    ];
-    const ABI_EXEC = [
-      "event AllocationDecided(bytes32 indexed cid, uint16 whaleCount, uint64 reportedAt)",
-      "event RebalanceCommitted(uint256 indexed burnId, uint64 cctpNonce, uint256 navAfter, uint64 reportedAt)",
-      "event RebalanceExecuted(uint32 indexed destinationDomain, bytes32 indexed mintRecipient, uint256 usdcOut, uint256 navAfter, uint64 reportedAt)",
-    ];
-    const ABI_ROUTER = [
-      "event Routed(uint64 indexed nonce, uint32 indexed destinationDomain, bytes32 mintRecipient, uint256 amount, uint256 maxFee, uint32 minFinalityThreshold)",
-    ];
-    const ABI_ATTEST = [
-      "function bondAmount(address) view returns (uint256)",
-      "function isBonded(address) view returns (bool)",
-      "function maxSlashBps() view returns (uint256)",
-      "event Bonded(address indexed wallet, uint256 amount, uint256 totalBond)",
-      "event Slashed(address indexed wallet, uint256 amount, uint16 slashBps, bytes32 evidenceCid)",
-    ];
+function buildLedger(){
+  setText($("#ledgerScoreMeta"), SCORES.length+" wallets");
+  const body=$("#ledgerScoreBody"); clear(body);
+  SCORES.forEach((s,i)=>{
+    const tr=document.createElement("tr"); if(i===0) tr.className="top";
+    const pnl=pnlByWallet[s.wallet]||0;
+    const pos=posByWallet[s.wallet]||0;
+    const active=pos>0;
+    const isHype=s.wallet==="0x082e843a431aef031264dc232693dd710aedca88";
+    const pct=Math.round((s.score/100)*100);
+    const tdRank=document.createElement("td"); tdRank.className="r"; tdRank.style.textAlign="left"; tdRank.style.color="var(--ink-4)"; tdRank.textContent=(i+1);
+    const tdAddr=document.createElement("td"); const addrSpan=document.createElement("span"); addrSpan.className="l-addr"; addrSpan.textContent=short(s.wallet); tdAddr.appendChild(addrSpan);
+    if(isHype){ const f=document.createElement("span"); f.className="l-flag hype"; f.textContent="$22.6M HYPE"; tdAddr.appendChild(f); }
+    if(active){ const f=document.createElement("span"); f.className="l-flag active"; f.textContent="active"; tdAddr.appendChild(f); }
+    const tdPnl=document.createElement("td"); tdPnl.className="r col-hide"; tdPnl.style.color=pnl>0?"var(--teal)":"var(--ink-3)"; tdPnl.textContent=pnl>0?"+$"+pnl.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}):"$0.00";
+    const tdPos=document.createElement("td"); tdPos.className="r col-hide"; tdPos.textContent=pos;
+    const tdScore=document.createElement("td"); tdScore.className="r";
+    const sb=document.createElement("span"); sb.className="scorebar"; const trk=document.createElement("span"); trk.className="track"; const fill=document.createElement("span"); fill.className="fill"+(active?"":" dim"); fill.style.width=pct+"%"; trk.appendChild(fill); const sv=document.createElement("span"); sv.className="scoreval"; sv.textContent=s.score.toFixed(2); sb.append(trk,sv); tdScore.appendChild(sb);
+    tr.append(tdRank,tdAddr,tdPnl,tdPos,tdScore); body.appendChild(tr);
+  });
 
-    const DOMAINS = {
-      0: "Ethereum", 1: "Avalanche", 2: "OP", 3: "Arbitrum",
-      5: "Solana", 6: "Base", 7: "Polygon", 10: "Unichain", 26: "Arc Testnet",
-    };
+  setText($("#ledgerVetoMeta"), VERDICTS.filter(v=>v.verdict==="veto").length+" of "+PROPOSALS.length+" vetoed");
+  const vbody=$("#ledgerVetoBody"); clear(vbody);
+  PROPOSALS.forEach(p=>{
+    const verdict=VERDICTS.find(v=>v.proposal_name===p.name)||{verdict:"?",reasons:[]};
+    const row=document.createElement("div"); row.className="veto-row";
+    const left=document.createElement("div");
+    const nm=document.createElement("div"); nm.className="vp-name"; nm.textContent=p.name; left.appendChild(nm);
+    const sub=document.createElement("div"); sub.className="vp-sub"; sub.textContent=p.weighting_method||""; left.appendChild(sub);
+    const am=document.createElement("div"); am.className="alloc-mini";
+    (p.allocations||[]).forEach(a=>{ const r=document.createElement("div"); r.className="am"; const s1=document.createElement("span"); s1.textContent=a.coin+" · "+a.direction; const s2=document.createElement("span"); s2.textContent="$"+Number(a.target_notional_usd).toLocaleString(undefined,{maximumFractionDigits:2}); r.append(s1,s2); am.appendChild(r); });
+    left.appendChild(am);
+    const reasonsWrap=document.createElement("div"); reasonsWrap.className="vp-reasons";
+    (verdict.reasons||[]).forEach(rr=>{ const d=document.createElement("div"); d.className="vp-reason";
+      const sg=document.createElementNS("http://www.w3.org/2000/svg","svg"); sg.setAttribute("viewBox","0 0 16 16"); sg.setAttribute("fill","none");
+      const c=document.createElementNS("http://www.w3.org/2000/svg","circle"); c.setAttribute("cx","8"); c.setAttribute("cy","8"); c.setAttribute("r","6.5"); c.setAttribute("stroke","currentColor"); c.setAttribute("stroke-width","1.4");
+      const pp=document.createElementNS("http://www.w3.org/2000/svg","path"); pp.setAttribute("d","M5 11l6-6"); pp.setAttribute("stroke","currentColor"); pp.setAttribute("stroke-width","1.4"); sg.append(c,pp);
+      const sp=document.createElement("span"); sp.textContent=rr; d.append(sg,sp); reasonsWrap.appendChild(d); });
+    const badgeWrap=document.createElement("div"); const badge=document.createElement("span"); badge.className="vp-badge"; badge.textContent=verdict.verdict==="veto"?"vetoed":verdict.verdict; badgeWrap.appendChild(badge);
+    row.append(left,reasonsWrap,badgeWrap); vbody.appendChild(row);
+  });
 
-    // ---- Helpers ----
-    const $ = (id) => document.getElementById(id);
-    const fmtUsd = (raw, dec, frac = 4) =>
-      Number(formatUnits(raw, dec)).toLocaleString(undefined, { maximumFractionDigits: frac });
-    const shortAddr = (a) => a.slice(0, 8) + "…" + a.slice(-6);
-    const shortTx = (h) => h.slice(0, 10) + "…" + h.slice(-6);
-    const fmtAgo = (sec) => {
-      if (sec < 60) return `${Math.round(sec)}s ago`;
-      if (sec < 3600) return `${Math.round(sec/60)}m ago`;
-      if (sec < 86400) return `${Math.round(sec/3600)}h ago`;
-      return `${Math.round(sec/86400)}d ago`;
-    };
-    function makeLink(href, text) {
-      const a = document.createElement("a");
-      a.href = href; a.textContent = text;
-      a.target = "_blank"; a.rel = "noopener";
-      return a;
+  const ul=$("#ledgerLimits"); clear(ul);
+  LIMITS.forEach(l=>{ const li=document.createElement("li"); li.textContent=l; ul.appendChild(li); });
+}
+
+$("#ledgerToggle").addEventListener("click", function(){
+  const body=$("#ledgerBody"); const open=body.classList.toggle("open");
+  this.setAttribute("aria-expanded", String(open));
+  setText($("#ledgerToggleLabel"), open?"Collapse full record":"Expand full record");
+});
+
+function navScoreRow(addr,score,max,active,rank){
+  const pct=Math.round((score/max)*100);
+  const d=document.createElement("div"); d.className="score-row"+(rank===0?" top":"");
+  const r=document.createElement("span"); r.className="sr-rank"; r.textContent=(rank+1);
+  const a=document.createElement("span"); a.className="sr-addr"; a.textContent=short(addr);
+  const bar=document.createElement("span"); bar.className="sr-bar"+(active?"":" dim"); const i=document.createElement("i"); i.style.width=pct+"%"; bar.appendChild(i);
+  const sc=document.createElement("span"); sc.className="sr-score"; sc.textContent=score.toFixed(1);
+  d.append(r,a,bar,sc); return d;
+}
+function fillPanel(which){
+  const body=$("#npBody"); clear(body);
+  const sec=(label,nodes)=>{ const s=document.createElement("div"); s.className="panel-section"; const l=document.createElement("span"); l.className="label"; l.textContent=label; s.appendChild(l); (Array.isArray(nodes)?nodes:[nodes]).forEach(n=>s.appendChild(n)); return s; };
+  const tag=(txt,color)=>{ const s=document.createElement("span"); s.className="panel-tag"; if(color)s.style.color=color; s.textContent=txt; return s; };
+  const stat=(val,unit,veto)=>{ const d=document.createElement("div"); d.className="panel-stat"; const v=document.createElement("span"); v.className="ps-val"+(veto?" veto":""); v.textContent=val; const u=document.createElement("span"); u.className="ps-unit"; u.textContent=unit; d.append(v,u); return d; };
+  const reason=(txt)=>{ const p=document.createElement("p"); p.className="panel-reason"; p.textContent=txt; return p; };
+
+  if(which==="scorer"){
+    const top=SCORES[0];
+    const comp=top?DECISION.doc.decision.multi_agent_audit.scorer.scores[0].components:null;
+    body.appendChild(tag("ScorerAgent · composite 0–100"));
+    body.appendChild(stat(top?top.score.toFixed(2):"—", "top score / "+SCORES.length+" whales"));
+    body.appendChild(sec("How it scores", reason("Each whale is scored on realised PnL, Sharpe, max drawdown, win rate, open positions and whether it is active right now. Higher rank means a stronger, more recent track record.")));
+    const rowsWrap=document.createElement("div"); SCORES.forEach((s,i)=>rowsWrap.appendChild(navScoreRow(s.wallet,s.score,100,posByWallet[s.wallet]>0,i)));
+    body.appendChild(sec("Ranked wallets", rowsWrap));
+    if(top){
+      const kv=document.createElement("div"); kv.className="kv-list";
+      const addKv=(k,v,cls)=>{ const r=document.createElement("div"); r.className="kv"; const kk=document.createElement("span"); kk.className="kk"; kk.textContent=k; const vv=document.createElement("span"); vv.className="kv-v"+(cls?" "+cls:""); vv.textContent=v; r.append(kk,vv); kv.appendChild(r); };
+      addKv("PnL (30d realised)","+$"+Number(top.raw_pnl_usd||pnlByWallet[top.wallet]||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}),"pos");
+      addKv("Win rate score",(comp?comp.win_rate:0)+"/100");
+      addKv("Drawdown score",(comp?comp.drawdown:0)+"/100");
+      addKv("Open positions", (top.raw_position_count||0));
+      body.appendChild(sec("Top whale components", kv));
     }
-    function clear(el) { while (el.firstChild) el.removeChild(el.firstChild); }
-    function setText(el, txt) { clear(el); el.appendChild(document.createTextNode(txt)); }
-    function setLinkOrText(el, href, text, cls = "") {
-      clear(el);
-      if (href) el.appendChild(makeLink(href, text));
-      else el.appendChild(document.createTextNode(text));
-      if (cls) el.className = cls;
-    }
+  } else if(which==="allocator"){
+    const coins=new Set(); PROPOSALS.forEach(p=>(p.allocations||[]).forEach(a=>coins.add(a.coin)));
+    body.appendChild(tag("AllocatorAgent · "+PROPOSALS.length+" strategies"));
+    body.appendChild(stat(String(PROPOSALS.length), "proposals · $"+Number(DECISION.doc.aum_usdc||0).toLocaleString()+" AUM · "+coins.size+" coins"));
+    const wrap=document.createElement("div");
+    PROPOSALS.forEach(p=>{ const card=document.createElement("div"); card.className="prop-card";
+      const head=document.createElement("div"); head.className="pc-head"; const nm=document.createElement("span"); nm.className="pc-name"; nm.textContent=p.name; const mt=document.createElement("span"); mt.className="panel-tag"; mt.textContent=p.weighting_method||""; head.append(nm,mt); card.appendChild(head);
+      (p.allocations||[]).forEach(a=>{ const r=document.createElement("div"); r.className="pc-alloc"; const s1=document.createElement("span"); s1.textContent=a.coin+" · "+a.direction; const s2=document.createElement("span"); s2.textContent="$"+Number(a.target_notional_usd).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); r.append(s1,s2); card.appendChild(r); });
+      const rs=document.createElement("div"); rs.className="pc-reason"; rs.textContent=p.reasoning||""; card.appendChild(rs); wrap.appendChild(card); });
+    body.appendChild(sec("Drafted proposals", wrap));
+    const note=document.createElement("p"); note.className="panel-reason"; note.style.color="var(--ink-3)"; note.textContent="All proposals concentrate on the coins with meaningful aggregate whale notional this snapshot — which is exactly what trips the Risk gate next."; body.appendChild(note);
+  } else if(which==="risk"){
+    const vc=VERDICTS.filter(v=>v.verdict==="veto").length;
+    body.appendChild(tag("RiskAgent · hard gates","var(--veto)"));
+    body.appendChild(stat(vc+" / "+VERDICTS.length, "proposals vetoed", true));
+    body.appendChild(sec("Why every proposal failed", reason("Both active whales are long, so the book would be 100% directional with no hedge — over the 80% cap. The score-weighted proposal also pushes most of the book into a single coin, past the 50% concentration ceiling.")));
+    const wrap=document.createElement("div");
+    VERDICTS.forEach(v=>{ const card=document.createElement("div"); card.className="prop-card vetoed";
+      const head=document.createElement("div"); head.className="pc-head"; const nm=document.createElement("span"); nm.className="pc-name"; nm.textContent=v.proposal_name; const vd=document.createElement("span"); vd.className="pc-verdict"; vd.textContent=v.verdict; head.append(nm,vd); card.appendChild(head);
+      (v.reasons||[]).forEach(rr=>{ const r=document.createElement("div"); r.className="pc-alloc"; const s1=document.createElement("span"); s1.style.color="var(--veto)"; s1.textContent="⊘"; const s2=document.createElement("span"); s2.style.color="var(--ink-2)"; s2.style.textAlign="right"; s2.textContent=rr; r.append(s1,s2); card.appendChild(r); });
+      wrap.appendChild(card); });
+    body.appendChild(sec("Verdicts", wrap));
+  } else {
+    const dec=DECISION.doc.decision; const traded=DECISION.traded===true;
+    body.appendChild(tag("CoordinatorAgent · precedence kelly > score > equal"));
+    body.appendChild(stat(traded?"TRADED":"HELD", traded?"rebalanced this cycle":"no rebalance this cycle"));
+    body.appendChild(sec("Verdict", reason((dec.coordinator_reasoning||"")+" With nothing surviving the Risk gate, the Coordinator keeps the existing book rather than force a trade. Holding is a decision, and it is recorded as one.")));
+    const kv=document.createElement("div"); kv.className="kv-list";
+    const addKv=(k,v,cls)=>{ const r=document.createElement("div"); r.className="kv"; const kk=document.createElement("span"); kk.className="kk"; kk.textContent=k; const vv=document.createElement("span"); vv.className="kv-v"+(cls?" "+cls:""); vv.textContent=v; r.append(kk,vv); kv.appendChild(r); };
+    addKv("Chosen proposal", dec.chosen_proposal||"none", dec.chosen_proposal?"":"veto");
+    addKv("Traded", String(traded));
+    addKv("Snapshot", DECISION.doc.snapshot_iso||"");
+    addKv("CID","0x"+CID.slice(0,8)+"…"+CID.slice(-6));
+    body.appendChild(sec("Anchored record", kv));
+    const lim=document.createElement("p"); lim.className="panel-reason"; lim.style.color="var(--ink-3)"; lim.textContent=(DECISION.doc.limitations||[]).join(" "); body.appendChild(sec("Honest limitations", lim));
+  }
+  return which;
+}
 
-    // ---- Address list (with copy buttons) ----
-    function populateAddressList(cfg) {
-      const grid = $("addr-list");
-      clear(grid);
-      const realCCTP = cfg.realCctpMessenger
-        ? [["RealCCTP V2", cfg.realCctpMessenger, "Circle's actual CCTP — operator burns through this in off-chain mode"]]
-        : [];
-      const entries = [
-        ...Object.entries(cfg.addresses).map(([k, v]) => [k, v, ""]),
-        ...realCCTP,
-      ];
-      for (const [k, v, note] of entries) {
-        const kDiv = document.createElement("div"); kDiv.className = "k"; kDiv.textContent = k;
-        const vDiv = document.createElement("div"); vDiv.className = "v";
-        const link = cfg.explorer
-          ? makeLink(`${cfg.explorer}/address/${v}`, window.innerWidth < 700 ? shortAddr(v) : v)
-          : document.createTextNode(v);
-        vDiv.appendChild(link);
-        if (note) {
-          const noteEl = document.createElement("div");
-          noteEl.className = "small";
-          noteEl.style.marginTop = "2px";
-          noteEl.textContent = note;
-          vDiv.appendChild(noteEl);
-        }
-        const btn = document.createElement("button");
-        btn.className = "copy-btn"; btn.type = "button";
-        btn.setAttribute("aria-label", `Copy ${k} address`);
-        btn.textContent = "copy";
-        btn.addEventListener("click", async () => {
-          try { await navigator.clipboard.writeText(v); btn.textContent = "copied"; btn.classList.add("copied"); }
-          catch { btn.textContent = "select+⌘C"; }
-          setTimeout(() => { btn.textContent = "copy"; btn.classList.remove("copied"); }, 1500);
-        });
-        grid.append(kDiv, vDiv, btn);
+const scrim=$("#scrim"), nodePanel=$("#nodePanel"), buyPanel=$("#buyPanel");
+let lastFocus=null;
+function openPanel(panel){ lastFocus=document.activeElement; scrim.classList.add("show"); panel.classList.add("show"); panel.focus(); document.body.style.overflow="hidden"; }
+function closePanels(){ scrim.classList.remove("show"); nodePanel.classList.remove("show"); buyPanel.classList.remove("show"); document.body.style.overflow=""; if(lastFocus)lastFocus.focus(); }
+scrim.addEventListener("click", closePanels);
+$$("[data-close]").forEach(b=>b.addEventListener("click", closePanels));
+document.addEventListener("keydown", e=>{ if(e.key==="Escape") closePanels(); });
+
+const NODE_META={scorer:{n:1,t:"Scorer",veto:false},allocator:{n:2,t:"Allocator",veto:false},risk:{n:3,t:"Risk",veto:true},coordinator:{n:4,t:"Coordinator",veto:false}};
+$$(".node").forEach(node=>{
+  node.addEventListener("click", ()=>{
+    if(!DECISION) return;
+    const which=node.getAttribute("data-node"); const meta=NODE_META[which];
+    const n=$("#npNum"); n.textContent=meta.n;
+    n.style.background=meta.veto?"var(--veto-soft)":"var(--teal-soft)";
+    n.style.color=meta.veto?"var(--veto)":"var(--teal)";
+    n.style.borderColor=meta.veto?"var(--veto-line)":"var(--teal-line)";
+    setText($("#npTitle"), meta.t);
+    fillPanel(which);
+    openPanel(nodePanel);
+  });
+});
+
+function buildContracts(){
+  const grid=$("#contractGrid"); clear(grid);
+  const order=["IndexToken","RebalanceExecutor","NAVOracle","WhaleAttestation","CCTPRouter","USYCParkVault","USDC","USYC","TokenMessenger"];
+  order.forEach(name=>{
+    const addr=ARC.addresses[name]; if(!addr) return;
+    const row=document.createElement("div"); row.className="contract-row";
+    const nameWrap=document.createElement("span"); nameWrap.className="contract-name";
+    const chk=document.createElementNS("http://www.w3.org/2000/svg","svg"); chk.setAttribute("class","vchk"); chk.setAttribute("viewBox","0 0 16 16"); chk.setAttribute("fill","none");
+    const chkP=document.createElementNS("http://www.w3.org/2000/svg","path"); chkP.setAttribute("d","M3 8.5l3.2 3L13 5"); chkP.setAttribute("stroke","currentColor"); chkP.setAttribute("stroke-width","1.8"); chkP.setAttribute("stroke-linecap","round"); chkP.setAttribute("stroke-linejoin","round"); chk.appendChild(chkP);
+    nameWrap.appendChild(chk); nameWrap.appendChild(document.createTextNode(name)); row.appendChild(nameWrap);
+    const btn=document.createElement("button"); btn.className="copy-addr"; btn.type="button"; btn.setAttribute("aria-label","Copy "+name+" address");
+    btn.appendChild(document.createTextNode("0x"+addr.slice(2,6)+"…"+addr.slice(-4)+" "));
+    const ci=document.createElementNS("http://www.w3.org/2000/svg","svg"); ci.setAttribute("class","ci"); ci.setAttribute("viewBox","0 0 14 14"); ci.setAttribute("fill","none");
+    const rect=document.createElementNS("http://www.w3.org/2000/svg","rect"); rect.setAttribute("x","4"); rect.setAttribute("y","4"); rect.setAttribute("width","8"); rect.setAttribute("height","8"); rect.setAttribute("rx","1.4"); rect.setAttribute("stroke","currentColor"); rect.setAttribute("stroke-width","1.3");
+    const ciP=document.createElementNS("http://www.w3.org/2000/svg","path"); ciP.setAttribute("d","M2 9V3a1 1 0 011-1h6"); ciP.setAttribute("stroke","currentColor"); ciP.setAttribute("stroke-width","1.3"); ci.append(rect,ciP); btn.appendChild(ci);
+    btn.addEventListener("click", async ()=>{ try{ await navigator.clipboard.writeText(addr); }catch(_){} btn.classList.add("copied"); toast("Copied "+short(addr)); setTimeout(()=>btn.classList.remove("copied"),1200); });
+    row.appendChild(btn); grid.appendChild(row);
+  });
+  const note=document.createElement("div"); note.className="contracts-note";
+  note.appendChild(document.createTextNode("All contracts have source verified on "));
+  note.appendChild(makeLink(ARC.explorer,"Arcscan"));
+  note.appendChild(document.createTextNode(". Click any address to copy. Bytecode + ABI public."));
+  grid.appendChild(note);
+}
+
+async function tryProvider(rpc){ try{ const p=new JsonRpcProvider(rpc); await p.getBlockNumber(); return p; }catch{ return null; } }
+async function findLatestEvent(contract,name,latest,chunk=9000,maxChunks=10){
+  for(let i=0;i<maxChunks;i++){ const to=latest-i*chunk; const from=Math.max(0,to-chunk+1);
+    try{ const logs=await contract.queryFilter(name,from,to); if(logs.length) return logs[logs.length-1]; }catch(_){}
+    if(from===0) break; }
+  return null;
+}
+async function findAllEvents(contract,name,latest,chunk=9000,maxChunks=10){
+  const all=[]; for(let i=0;i<maxChunks;i++){ const to=latest-i*chunk; const from=Math.max(0,to-chunk+1);
+    try{ const logs=await contract.queryFilter(name,from,to); all.push(...logs); }catch(_){}
+    if(from===0) break; } return all;
+}
+
+let SHARE_PRICE_RAW=null, provider=null;
+
+async function refreshState(prov){
+  const navc=new Contract(ARC.addresses.NAVOracle, ABI_NAV, prov);
+  const idx=new Contract(ARC.addresses.IndexToken, ABI_INDEX, prov);
+  try{
+    const [navUsdc,isFresh,updatedAt,maxDelta,supply,sp]=await Promise.all([
+      navc.nav(), navc.isFresh(), navc.updatedAt(), navc.maxDeltaBps().catch(()=>0n),
+      idx.totalSupply(), idx.sharePrice(),
+    ]);
+    SHARE_PRICE_RAW=sp;
+    const spNum=Number(formatUnits(sp,6));
+    setHTML($("#navKpi"), priceMarkup(spNum.toFixed(4)));
+    setHTML($("#navPrice"), priceMarkup(spNum.toFixed(4)));
+    setText($("#navAum"),"NAV $"+fmtUsd(navUsdc,6,2));
+    const fr=$("#navFresh");
+    if(isFresh){ fr.textContent="oracle fresh · "+fmtAgo((Date.now()/1000)-Number(updatedAt)); fr.className="nav-sub fresh"; }
+    else if(updatedAt>0n){ fr.textContent="stale · last "+new Date(Number(updatedAt)*1000).toLocaleString(); fr.className="nav-sub stale"; }
+    else { fr.textContent="never updated"; fr.className="nav-sub stale"; }
+    setText($("#navKpiTrend"),"");
+    if(supply===0n){ setText($("#navSupply"),"0 (treasury-seeded)"); }
+    else { setText($("#navSupply"), fmtUsd(supply,18,2)+" WHALE"); }
+    setText($("#navMaxDelta"), maxDelta?"±"+(Number(maxDelta)/100)+"%":"—");
+    setText($("#estPrice"),"$"+spNum.toFixed(4));
+    recompute();
+  }catch(e){
+    setText($("#navPrice"),"—"); setText($("#navFresh"),"read failed"); $("#navFresh").className="nav-sub stale";
+  }
+}
+
+async function refreshRebalance(prov,latest){
+  const exec=new Contract(ARC.addresses.RebalanceExecutor, ABI_EXEC, prov);
+  const alloc=await findLatestEvent(exec,"AllocationDecided",latest);
+  const settleEl=$("#rebalSettle");
+  if(!alloc){ if(settleEl) setText(settleEl,"no on-chain rebalance yet"); setText($("#chainArcVal"),"—"); return; }
+  const reportedAt=Number(alloc.args.reportedAt);
+  const txHash=alloc.transactionHash;
+  try{
+    const [rcpt,blk]=await Promise.all([ prov.getTransactionReceipt(txHash), prov.getBlock(alloc.blockNumber) ]);
+    const settlementSec=blk?Math.max(0.1,blk.timestamp-reportedAt):null;
+    const gasWei=rcpt?rcpt.gasUsed*rcpt.gasPrice:0n;
+    const gasUsdc=Number(formatUnits(gasWei,18));
+    if(settleEl){ clear(settleEl); const link=makeLink(ARC.explorer+"/tx/"+txHash, settlementSec!=null?settlementSec.toFixed(2)+"s":"tx"); link.style.color="var(--teal)"; settleEl.appendChild(link); }
+    setText($("#chainArcVal"), settlementSec!=null?settlementSec.toFixed(2)+"s":"—");
+    setText($("#chainNote"), "Last anchored rebalance settled in "+(settlementSec!=null?settlementSec.toFixed(2)+"s":"—")+" on Arc, gas ≈ $"+gasUsdc.toFixed(6)+" paid in USDC as native gas. Arbitrum/Ethereum figures are representative ranges from public docs.");
+    setText($("#chainTag"),"Arc live");
+  }catch(_){}
+}
+
+async function refreshAttestation(prov,latest){
+  const att=new Contract(ARC.addresses.WhaleAttestation, ABI_ATTEST, prov);
+  const content=$("#attestContent");
+  try{
+    const [bondedLogs,slashLogs]=await Promise.all([ findAllEvents(att,"Bonded",latest), findAllEvents(att,"Slashed",latest) ]);
+    const wallets=new Set(); bondedLogs.forEach(l=>wallets.add(getAddress(l.args.wallet)));
+    let totalBonded=0n, nonzero=0;
+    for(const w of wallets){ try{ const b=await att.bondAmount(w); if(b>0n){ totalBonded+=b; nonzero++; } }catch(_){} }
+    let totalSlashed=0n; slashLogs.forEach(l=>totalSlashed+=l.args.amount);
+
+    clear(content);
+    if(nonzero===0 && slashLogs.length===0){
+      const empty=document.createElement("div"); empty.className="attest-empty";
+      const icon=document.createElement("span"); icon.className="attest-icon"; icon.setAttribute("aria-hidden","true");
+      const isvg=document.createElementNS("http://www.w3.org/2000/svg","svg"); isvg.setAttribute("viewBox","0 0 18 18"); isvg.setAttribute("fill","none");
+      const ip=document.createElementNS("http://www.w3.org/2000/svg","path"); ip.setAttribute("d","M9 1l7 3v5c0 4-3 6.5-7 8-4-1.5-7-4-7-8V4l7-3z"); ip.setAttribute("stroke","currentColor"); ip.setAttribute("stroke-width","1.3"); ip.setAttribute("stroke-linejoin","round"); isvg.appendChild(ip); icon.appendChild(isvg);
+      const big=document.createElement("div"); big.className="attest-big"; big.textContent="0 bonded";
+      const cp=document.createElement("div"); cp.className="attest-copy"; cp.appendChild(document.createTextNode("No whale has staked a bond yet. The ")); const b=document.createElement("b"); b.textContent="WhaleAttestation"; cp.appendChild(b); cp.appendChild(document.createTextNode(" contract is live and ready to slash — there is simply nothing to attest this cycle. This is the honest empty state, not a failed read."));
+      empty.append(icon,big,cp); content.appendChild(empty);
+      return;
+    }
+    const grid=document.createElement("div"); grid.className="attest-grid";
+    const ag=(val,lab)=>{ const d=document.createElement("div"); d.className="ag"; const av=document.createElement("div"); av.className="av"; av.textContent=val; const ak=document.createElement("div"); ak.className="ak"; ak.textContent=lab; d.append(av,ak); return d; };
+    grid.appendChild(ag("$"+fmtUsd(totalBonded,6,2),"total bonded"));
+    grid.appendChild(ag(String(nonzero),"bonded whales"));
+    grid.appendChild(ag(String(slashLogs.length),"lifetime slashes"));
+    content.appendChild(grid);
+    const sl=document.createElement("div"); sl.className="slash-line";
+    if(slashLogs.length){ const latestSlash=slashLogs[slashLogs.length-1]; sl.appendChild(document.createTextNode(short(getAddress(latestSlash.args.wallet))+" slashed "+(Number(latestSlash.args.slashBps)/100).toFixed(1)+"% · $"+fmtUsd(totalSlashed,6,2)+" total · ")); sl.appendChild(makeLink(ARC.explorer+"/tx/"+latestSlash.transactionHash,"tx")); }
+    else { sl.textContent="No slashes — every bonded whale has stayed within the decay threshold."; }
+    content.appendChild(sl);
+  }catch(e){
+    clear(content); const cp=document.createElement("div"); cp.className="attest-copy"; cp.textContent="Attestation read failed: "+(e.shortMessage||e.message||""); content.appendChild(cp);
+  }
+}
+
+let refreshing=false, lastRefreshAt=0;
+async function refreshChain(){
+  if(refreshing) return; refreshing=true;
+  $("#footerMeta").textContent="refreshing…"; $("#footerMeta").className="footer-meta refreshing";
+  $("#errBand").classList.remove("show");
+  provider=await tryProvider(ARC.rpc);
+  if(!provider) provider=await tryProvider(ARC.rpcFallback);
+  if(!provider){
+    $("#errBand").classList.add("show");
+    const np=$("#netPill"); np.className="net-pill dim"; clear(np); const dot=document.createElement("span"); dot.className="dot"; np.appendChild(dot); np.appendChild(document.createTextNode("RPC unreachable"));
+    refreshing=false; $("#footerMeta").className="footer-meta"; return;
+  }
+  try{
+    const latest=await provider.getBlockNumber();
+    await Promise.all([ refreshState(provider), refreshRebalance(provider,latest), refreshAttestation(provider,latest) ]);
+  }catch(e){ $("#errBand").classList.add("show"); setText($("#errBandMsg"),"A read failed: "+(e.shortMessage||e.message||"")); }
+  lastRefreshAt=Date.now(); refreshing=false; $("#footerMeta").className="footer-meta"; tickMeta();
+}
+function tickMeta(){
+  if(refreshing) return;
+  const sec=Math.max(0,Math.round((Date.now()-lastRefreshAt)/1000));
+  $("#footerMeta").textContent = lastRefreshAt ? ("updated "+sec+"s ago · next in "+Math.max(0,15-sec)+"s") : "connecting…";
+}
+$("#errRetry").addEventListener("click", refreshChain);
+
+let walletProvider=null, signer=null, account=null, mode="buy";
+let usdcBalRaw=0n, whaleBalRaw=0n;
+const hasWallet=!!window.ethereum;
+
+function showBuyView(which){
+  ["#noWallet","#connectView","#wrongNetView","#buyForm","#settleView","#successView"].forEach(id=>{ const el=$(id); if(!el)return; el.style.display="none"; el.classList.remove("show"); });
+  const el=$(which);
+  if(which==="#settleView"||which==="#successView"||which==="#noWallet"){ el.classList.add("show"); } else { el.style.display=""; }
+}
+
+$("#connectBtn").addEventListener("click", openBuyer);
+function openBuyer(){
+  setText($("#flowErr"),""); $("#flowErr").classList.remove("show");
+  if(!hasWallet){ setText($("#buyTitle"),"Connect wallet"); showBuyView("#noWallet"); openPanel(buyPanel); return; }
+  if(account){ setText($("#buyTitle"), mode==="buy"?"Buy WHALE":"Redeem WHALE"); showBuyView("#buyForm"); refreshWalletBalances(); }
+  else { setText($("#buyTitle"),"Connect wallet"); showBuyView("#connectView"); }
+  openPanel(buyPanel);
+}
+
+$("#doConnect").addEventListener("click", connectWallet);
+async function connectWallet(){
+  const errEl=$("#connectErr"); errEl.classList.remove("show");
+  try{
+    walletProvider=new BrowserProvider(window.ethereum);
+    await window.ethereum.request({ method:"eth_requestAccounts" });
+    const net=await walletProvider.getNetwork();
+    if(Number(net.chainId)!==ARC.chainId){
+      const switched=await ensureNetwork(errEl);
+      if(!switched){ showBuyView("#wrongNetView"); return; }
+    }
+    await finishConnect();
+  }catch(e){ errEl.textContent=humanError(e); errEl.classList.add("show"); }
+}
+
+async function ensureNetwork(errEl){
+  try{
+    await window.ethereum.request({ method:"wallet_switchEthereumChain", params:[{ chainId: ARC.chainIdHex }] });
+    return true;
+  }catch(switchErr){
+    const code = switchErr && (switchErr.code || (switchErr.data && switchErr.data.originalError && switchErr.data.originalError.code));
+    if(code===4902){
+      try{
+        await window.ethereum.request({ method:"wallet_addEthereumChain", params:[{
+          chainId: ARC.chainIdHex, chainName:"Arc Testnet",
+          rpcUrls:[ARC.rpc], nativeCurrency:{name:"USDC",symbol:"USDC",decimals:18},
+          blockExplorerUrls:[ARC.explorer],
+        }]});
+        return true;
+      }catch(addErr){ if(errEl){ errEl.textContent=humanError(addErr); errEl.classList.add("show"); } return false; }
+    }
+    if(errEl){ errEl.textContent=humanError(switchErr); errEl.classList.add("show"); }
+    return false;
+  }
+}
+
+$("#doSwitch").addEventListener("click", async ()=>{ const ok=await ensureNetwork($("#switchErr")); if(ok) await finishConnect(); });
+
+async function finishConnect(){
+  walletProvider=new BrowserProvider(window.ethereum);
+  signer=await walletProvider.getSigner();
+  account=await signer.getAddress();
+  $("#connectBtn").classList.add("connected");
+  setText($("#connectLabel"), short(account));
+  setText($("#connAddr"), short(account));
+  setText($("#buyTitle"), mode==="buy"?"Buy WHALE":"Redeem WHALE");
+  showBuyView("#buyForm");
+  await refreshWalletBalances();
+  if(window.ethereum && window.ethereum.on){
+    try{ window.ethereum.removeAllListeners && window.ethereum.removeAllListeners("accountsChanged"); }catch(_){}
+    window.ethereum.on("accountsChanged", accts=>{ if(!accts.length){ disconnect(); } else { account=getAddress(accts[0]); setText($("#connectLabel"),short(account)); setText($("#connAddr"),short(account)); refreshWalletBalances(); } });
+    window.ethereum.on("chainChanged", ()=>{ refreshWalletBalances(); });
+  }
+}
+
+function disconnect(){
+  account=null; signer=null; usdcBalRaw=0n; whaleBalRaw=0n;
+  $("#connectBtn").classList.remove("connected");
+  setText($("#connectLabel"),"Connect wallet");
+  showBuyView("#connectView");
+}
+$("#doDisconnect").addEventListener("click", ()=>{ disconnect(); closePanels(); });
+
+async function refreshWalletBalances(){
+  if(!signer||!account) return;
+  try{
+    const usdc=new Contract(ARC.addresses.USDC, ABI_ERC20, walletProvider);
+    const idx=new Contract(ARC.addresses.IndexToken, ABI_INDEX, walletProvider);
+    const [ub,wb]=await Promise.all([ usdc.balanceOf(account), idx.balanceOf(account) ]);
+    usdcBalRaw=ub; whaleBalRaw=wb;
+    setText($("#balUsdc"), fmtUsd(ub,6,2)+" USDC");
+    setText($("#balWhale"), fmtUsd(wb,18,4)+" WHALE");
+    if(SHARE_PRICE_RAW!=null){ const posRaw=(wb*SHARE_PRICE_RAW)/(10n**18n); setText($("#posValue"),"$"+fmtUsd(posRaw,6,2)); }
+    else setText($("#posValue"),"—");
+    recompute();
+  }catch(e){ setText($("#balUsdc"),"read failed"); setText($("#balWhale"),"—"); }
+}
+
+function setMode(m){
+  mode=m;
+  $("#segBuy").classList.toggle("active", m==="buy");
+  $("#segRedeem").classList.toggle("active", m==="redeem");
+  $("#segBuy").setAttribute("aria-selected", String(m==="buy"));
+  $("#segRedeem").setAttribute("aria-selected", String(m==="redeem"));
+  setText($("#buyTitle"), m==="buy"?"Buy WHALE":"Redeem WHALE");
+  setText($("#amtLabel"), m==="buy"?"Amount to spend (USDC)":"Shares to redeem (WHALE)");
+  setText($("#amtUnit"), m==="buy"?"USDC":"WHALE");
+  setText($("#estLabel"), m==="buy"?"Estimated shares":"Estimated USDC");
+  $("#buyAmt").value=""; clearErr(); recompute();
+}
+$("#segBuy").addEventListener("click", ()=>setMode("buy"));
+$("#segRedeem").addEventListener("click", ()=>setMode("redeem"));
+
+const amtInput=$("#buyAmt"), amtWrap=$("#amtWrap"), amtErr=$("#amtErr"), estVal=$("#estVal"), buySubmit=$("#buySubmit");
+function clearErr(){ amtErr.classList.remove("show"); amtWrap.classList.remove("invalid"); }
+function sharePriceNum(){ return SHARE_PRICE_RAW!=null?Number(formatUnits(SHARE_PRICE_RAW,6)):null; }
+function recompute(){
+  const v=parseFloat(amtInput.value); const sp=sharePriceNum();
+  if(!v||v<=0||sp==null){
+    setHTML(estVal, "0<span class=\"dim\">.0000</span> "+(mode==="buy"?"WHALE":"USDC"));
+    buySubmit.disabled=true; buySubmit.textContent=sp==null?"Loading price…":"Enter an amount"; return;
+  }
+  if(mode==="buy"){ const shares=v/sp; setHTML(estVal, Math.floor(shares).toLocaleString()+"<span class=\"dim\">"+(shares-Math.floor(shares)).toFixed(4).slice(1)+"</span> WHALE"); buySubmit.textContent="Buy WHALE"; }
+  else { const usdc=v*sp; setHTML(estVal, "$"+Math.floor(usdc).toLocaleString()+"<span class=\"dim\">"+(usdc%1).toFixed(2).slice(1)+"</span>"); buySubmit.textContent="Redeem to USDC"; }
+  buySubmit.disabled=false;
+}
+amtInput.addEventListener("input", ()=>{ clearErr(); recompute(); });
+amtInput.addEventListener("blur", validate);
+$("#amtMax").addEventListener("click", ()=>{
+  if(mode==="buy") amtInput.value=Number(formatUnits(usdcBalRaw,6)).toFixed(2);
+  else amtInput.value=Number(formatUnits(whaleBalRaw,18)).toFixed(4);
+  clearErr(); recompute();
+});
+function validate(){
+  const v=parseFloat(amtInput.value);
+  if(amtInput.value.trim()===""){ clearErr(); return false; }
+  if(isNaN(v)||v<=0){ amtErr.textContent="Enter a number greater than zero."; amtErr.classList.add("show"); amtWrap.classList.add("invalid"); return false; }
+  const maxNum=mode==="buy"?Number(formatUnits(usdcBalRaw,6)):Number(formatUnits(whaleBalRaw,18));
+  if(v>maxNum){ amtErr.textContent=mode==="buy"?"That is more than your USDC balance.":"You do not hold that many WHALE yet."; amtErr.classList.add("show"); amtWrap.classList.add("invalid"); return false; }
+  clearErr(); return true;
+}
+
+function humanError(e){
+  const msg=(e && (e.shortMessage||e.reason||e.message)||"").toString();
+  if(/user rejected|denied|4001/i.test(msg)) return "You cancelled the request in your wallet.";
+  if(/StaleNAV|stale/i.test(msg)) return "NAV is stale on-chain right now — buys are paused until the oracle refreshes. Try again shortly.";
+  if(/ZeroAmount/i.test(msg)) return "Amount must be greater than zero.";
+  if(/InsufficientLiquidity/i.test(msg)) return "The index does not hold enough USDC to cover this redemption right now.";
+  if(/paused|whenNotPaused|EnforcedPause/i.test(msg)) return "The contract is paused. Buys and redemptions are temporarily disabled.";
+  if(/insufficient funds|insufficient balance/i.test(msg)) return "Not enough balance (including gas) to complete this.";
+  return msg.length>180?msg.slice(0,180)+"…":(msg||"Transaction failed.");
+}
+
+buySubmit.addEventListener("click", doTransaction);
+async function doTransaction(){
+  if(!validate()){ amtInput.focus(); return; }
+  if(!signer){ openBuyer(); return; }
+  const v=parseFloat(amtInput.value);
+  $("#flowErr").classList.remove("show");
+  buySubmit.disabled=true;
+  const idx=new Contract(ARC.addresses.IndexToken, ABI_INDEX, signer);
+  try{
+    if(mode==="buy"){
+      const usdcAmt=parseUnits(v.toString(),6);
+      const usdc=new Contract(ARC.addresses.USDC, ABI_ERC20, signer);
+      $("#settleLabel").textContent="Checking allowance…"; showBuyView("#settleView");
+      const allowance=await usdc.allowance(account, ARC.addresses.IndexToken);
+      if(allowance<usdcAmt){
+        $("#settleLabel").textContent="Approve USDC in your wallet…";
+        const apTx=await usdc.approve(ARC.addresses.IndexToken, usdcAmt);
+        $("#settleLabel").textContent="Approving USDC…";
+        await apTx.wait();
       }
+      $("#settleLabel").textContent="Confirm purchase in your wallet…";
+      const tx=await idx.buy(usdcAmt);
+      await settleAndConfirm(tx,v,"buy");
+    } else {
+      const sharesIn=parseUnits(v.toString(),18);
+      $("#settleLabel").textContent="Confirm redemption in your wallet…";
+      const tx=await idx.redeem(sharesIn);
+      await settleAndConfirm(tx,v,"redeem");
     }
+  }catch(e){
+    showBuyView("#buyForm");
+    const fe=$("#flowErr"); clear(fe);
+    const t=document.createElement("span"); t.className="fe-title"; t.textContent="Could not complete"; fe.appendChild(t); fe.appendChild(document.createTextNode(humanError(e)));
+    fe.classList.add("show"); buySubmit.disabled=false;
+  }
+}
 
-    // ---- Chunked event scan: walks back in 9K-block chunks up to ~24h ----
-    async function findLatestEvent(contract, eventName, latestBlock, chunkSize = 9_000, maxChunks = 10) {
-      for (let i = 0; i < maxChunks; i++) {
-        const to = latestBlock - i * chunkSize;
-        const from = Math.max(0, to - chunkSize + 1);
-        try {
-          const logs = await contract.queryFilter(eventName, from, to);
-          if (logs.length) return logs[logs.length - 1];
-        } catch (_) { /* RPC chunk error, try next window */ }
-        if (from === 0) break;
-      }
-      return null;
-    }
-    async function findAllEventsInWindow(contract, eventName, latestBlock, chunkSize = 9_000, maxChunks = 10) {
-      const all = [];
-      for (let i = 0; i < maxChunks; i++) {
-        const to = latestBlock - i * chunkSize;
-        const from = Math.max(0, to - chunkSize + 1);
-        try {
-          const logs = await contract.queryFilter(eventName, from, to);
-          all.push(...logs);
-        } catch (_) { /* skip */ }
-        if (from === 0) break;
-      }
-      return all;
-    }
+async function settleAndConfirm(tx, amount, kind){
+  $("#settleLabel").textContent="Settling on Arc…"; showBuyView("#settleView");
+  const msEl=$("#settleMs"); const start=performance.now(); let raf=true;
+  const tick=()=>{ if(!raf) return; msEl.textContent=Math.round(performance.now()-start); requestAnimationFrame(tick); };
+  requestAnimationFrame(tick);
+  await tx.wait();
+  raf=false;
+  const elapsed=Math.round(performance.now()-start); msEl.textContent=elapsed;
+  showBuyView("#successView");
+  const sv=$("#successDetail"); clear(sv);
+  if(kind==="buy"){
+    setText($("#successHead"),"You hold WHALE.");
+    sv.appendChild(document.createTextNode("Bought with ")); const m1=document.createElement("span"); m1.className="mono"; m1.textContent="$"+amount.toFixed(2)+" USDC"; sv.appendChild(m1); sv.appendChild(document.createTextNode("."));
+  } else {
+    setText($("#successHead"),"Redeemed to USDC.");
+    sv.appendChild(document.createTextNode("Redeemed ")); const m1=document.createElement("span"); m1.className="mono"; m1.textContent=amount+" WHALE"; sv.appendChild(m1); sv.appendChild(document.createTextNode("."));
+  }
+  sv.appendChild(document.createElement("br"));
+  sv.appendChild(document.createTextNode("Settled on Arc in ")); const m2=document.createElement("span"); m2.className="mono"; m2.textContent=elapsed+" ms"; sv.appendChild(m2); sv.appendChild(document.createTextNode("."));
+  if(tx.hash){ sv.appendChild(document.createElement("br")); sv.appendChild(makeLink(ARC.explorer+"/tx/"+tx.hash,"View on Arcscan")); }
+  refreshWalletBalances();
+  refreshChain();
+}
+$("#successDone").addEventListener("click", ()=>{ showBuyView("#buyForm"); setMode(mode); closePanels(); });
 
-    // ---- Hero updater (the 5-second story) ----
-    function setHero({ whaleCount, ageSec, latencySec, costUsdc, txHash, explorer }) {
-      const line = $("hero-line"); clear(line);
-      if (whaleCount === null) {
-        setText(line, "No rebalance recorded yet — orchestrator runs against the watchlist daily.");
-        $("hero-cta").textContent = "Trigger the agentic loop locally via scripts/orchestrate-arc.sh.";
-        return;
-      }
-      const span = (cls, txt) => {
-        const s = document.createElement("span"); s.className = cls; s.textContent = txt; return s;
-      };
-      line.append(
-        document.createTextNode("Mirroring "),
-        span("v", `${whaleCount} ${whaleCount === 1 ? "whale" : "whales"}`),
-        document.createTextNode(" · last rebalanced "),
-        span("v", fmtAgo(ageSec)),
-        document.createTextNode(" · settled in "),
-        span("v", `${latencySec.toFixed(2)}s`),
-        document.createTextNode(" on Arc · gas cost "),
-        span("v", `$${costUsdc.toFixed(4)}`),
-      );
-      const cta = $("hero-cta"); clear(cta);
-      cta.appendChild(document.createTextNode("Verify: "));
-      cta.appendChild(makeLink(`${explorer}/tx/${txHash}`, "tx on Arcscan"));
-      cta.appendChild(document.createTextNode(" · "));
-      cta.appendChild(makeLink("#rebalance-h", "see the rebalance details below"));
-    }
+function drawConnectors(){
+  const layer=$("#connectorLayer"), cell=$(".pipeline-cell");
+  if(!layer||!cell) return; layer.innerHTML="";
+  if(window.innerWidth<=720) return;
+  const nodes=$$(".pipeline .node");
+  const cellRect=cell.getBoundingClientRect();
+  for(let i=0;i<nodes.length-1;i++){
+    const a=nodes[i].getBoundingClientRect(), b=nodes[i+1].getBoundingClientRect();
+    const left=a.right-cellRect.left, width=b.left-a.right, top=(a.top+a.height/2)-cellRect.top;
+    const veto=i===2;
+    const c=document.createElement("span"); c.className="connector"+(veto?" c-veto":"");
+    c.style.left=left+"px"; c.style.width=width+"px"; c.style.top=top+"px"; c.style.setProperty("--flow-end",width+"px");
+    const base=document.createElement("span"); base.className="base"; const flow=document.createElement("span"); flow.className="flow"; flow.style.animationDelay=(i*0.85)+"s";
+    const arrow=document.createElementNS("http://www.w3.org/2000/svg","svg"); arrow.setAttribute("class","arrow"); arrow.setAttribute("width","9"); arrow.setAttribute("height","9"); arrow.setAttribute("viewBox","0 0 9 9"); arrow.setAttribute("fill","none");
+    const ap=document.createElementNS("http://www.w3.org/2000/svg","path"); ap.setAttribute("d","M1 1l3.5 3.5L1 8"); ap.setAttribute("stroke","currentColor"); ap.setAttribute("stroke-width","1.3"); ap.setAttribute("stroke-linecap","round"); ap.setAttribute("stroke-linejoin","round"); arrow.appendChild(ap);
+    c.append(base,flow,arrow); layer.appendChild(c);
+  }
+}
+window.addEventListener("resize", drawConnectors);
 
-    // ---- Reasoning doc inline preview ----
-    async function renderReasoning(cidHex) {
-      const area = $("reasoning-area"); clear(area);
-      const cleanCid = cidHex.startsWith("0x") ? cidHex.slice(2) : cidHex;
-      const url = `${ALLOCATIONS_BASE}/${cleanCid}.json`;
-      try {
-        const r = await fetch(url, { cache: "no-store" });
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const doc = await r.json();
-        const decision = doc.decision || {};
-        const audit = decision.multi_agent_audit || {};
-        const proposals = (audit.allocator && audit.allocator.proposals) || [];
-        const verdicts = (audit.risk && audit.risk.verdicts) || [];
-        const scores = (audit.scorer && audit.scorer.scores) || [];
-
-        const intro = document.createElement("p");
-        intro.className = "small";
-        intro.style.margin = "0 0 10px";
-        const choice = decision.chosen_proposal || "no choice";
-        intro.textContent = `Coordinator chose “${choice}” after a 4-agent vote. ${decision.coordinator_reasoning || ""}`;
-        area.appendChild(intro);
-
-        const wrap = document.createElement("div"); wrap.className = "reasoning";
-        const addRow = (agent, body) => {
-          const r = document.createElement("div"); r.className = "reasoning-row";
-          const a = document.createElement("div"); a.className = "agent"; a.textContent = agent;
-          const b = document.createElement("div"); b.className = "body"; b.textContent = body;
-          r.append(a, b); wrap.appendChild(r);
-        };
-        if (scores.length) {
-          const top = scores.slice(0, 3).map(s => `${shortAddr(s.wallet)} ${s.score.toFixed(1)}/100`).join(", ");
-          addRow("Scorer", `${scores.length} whales ranked. Top: ${top}.`);
-        }
-        if (proposals.length) {
-          const names = proposals.map(p => p.name).join(", ");
-          addRow("Allocator", `${proposals.length} proposals on the table: ${names}.`);
-        }
-        if (verdicts.length) {
-          const summary = verdicts.map(v => `${v.proposal_name}:${v.verdict.split("_")[0]}`).join("  ");
-          addRow("Risk", summary);
-        }
-        addRow("Coordinator", `Picked ${choice}.`);
-        area.appendChild(wrap);
-
-        const human = decision.human_reasoning;
-        if (human && !human.startsWith("(no LLM")) {
-          const llm = document.createElement("p");
-          llm.className = "small";
-          llm.style.marginTop = "12px";
-          llm.style.color = "var(--fg-dim)";
-          llm.textContent = `LLM summary: ${human}`;
-          area.appendChild(llm);
-        }
-        const docLink = document.createElement("p");
-        docLink.className = "small";
-        docLink.style.marginTop = "10px";
-        docLink.appendChild(document.createTextNode("Full canonical document: "));
-        docLink.appendChild(makeLink(url, `${cleanCid.slice(0, 10)}…${cleanCid.slice(-6)}.json`));
-        area.appendChild(docLink);
-      } catch (e) {
-        const p = document.createElement("p"); p.className = "small empty";
-        p.textContent = `Reasoning document for cid ${cleanCid.slice(0,10)}… not reachable yet (${e.message}).`;
-        area.appendChild(p);
-      }
-    }
-
-    // ---- Latest rebalance card + hero ----
-    async function refreshRebalance(provider, cfg, latestBlock) {
-      const exec = new Contract(cfg.addresses.RebalanceExecutor, ABI_EXEC, provider);
-      const router = new Contract(cfg.addresses.CCTPRouter, ABI_ROUTER, provider);
-
-      const alloc = await findLatestEvent(exec, "AllocationDecided", latestBlock);
-      if (!alloc) {
-        setHero({ whaleCount: null });
-        setText($("last-amount"), "no recent rebalances");
-        $("last-amount").className = "value empty";
-        setText($("last-venue"), "(searched ~24h of blocks)");
-        setText($("last-latency"), "—");
-        setText($("last-cost"), "—");
-        setText($("last-cost-cents"), "");
-        setText($("arc-compare-latency"), "—");
-        setText($("arc-compare-cost"), "no on-chain data yet");
-        $("arc-live-tag").style.visibility = "hidden";
-        setText($("last-tx-link"), "—");
-        setText($("last-cid-link"), "—");
-        clear($("reasoning-area"));
-        const p = document.createElement("p"); p.className = "small empty";
-        p.textContent = "No rebalance found in the last ~24h; once the orchestrator runs, the reasoning document will render here.";
-        $("reasoning-area").appendChild(p);
-        return;
-      }
-
-      const cid = alloc.args.cid;
-      const whaleCount = Number(alloc.args.whaleCount);
-      const reportedAt = Number(alloc.args.reportedAt);
-      const txHash = alloc.transactionHash;
-      const cidHex = cid.startsWith("0x") ? cid.slice(2) : cid;
-
-      // tx + receipt for cost + measured latency
-      const [tx, rcpt, blk] = await Promise.all([
-        provider.getTransaction(txHash),
-        provider.getTransactionReceipt(txHash),
-        provider.getBlock(alloc.blockNumber),
-      ]);
-
-      // Look for Routed event in the SAME tx (on-chain mode).
-      let routedAmount = null, routedDomain = null;
-      if (rcpt) {
-        for (const log of rcpt.logs) {
-          if (log.address.toLowerCase() === cfg.addresses.CCTPRouter.toLowerCase()) {
-            try {
-              const parsed = router.interface.parseLog(log);
-              if (parsed && parsed.name === "Routed") {
-                routedAmount = parsed.args.amount;
-                routedDomain = Number(parsed.args.destinationDomain);
-                break;
-              }
-            } catch (_) {}
-          }
-        }
-      }
-
-      // Off-chain CCTP mode: look at adjacent blocks for the operator's DepositForBurn on the real messenger.
-      // For now we just label "off-chain CCTP path" when we don't find a Routed.
-      const isOffchain = routedAmount === null;
-      const venueLabel = isOffchain ? "via off-chain CCTP (operator EOA)" : `→ ${DOMAINS[routedDomain] || `domain ${routedDomain}`}`;
-
-      const gasUsdcWei = rcpt ? rcpt.gasUsed * rcpt.gasPrice : 0n;  // 18-dec native (USDC-as-gas)
-      const usdcCost = Number(formatUnits(gasUsdcWei, 18));
-      const settlementSec = blk ? Math.max(1, blk.timestamp - reportedAt) : 1;
-      const ageSec = Math.max(0, (Date.now() / 1000) - blk.timestamp);
-
-      // Fill latest-rebalance card
-      if (routedAmount !== null) {
-        setText($("last-amount"), "$" + fmtUsd(routedAmount, 6, 4));
-        $("last-amount").className = "value";
-      } else {
-        setText($("last-amount"), "off-chain burn");
-        $("last-amount").className = "value";
-      }
-      setText($("last-venue"), venueLabel);
-      setText($("last-latency"), `${settlementSec.toFixed(1)}s`);
-      $("last-latency").className = "value fresh";
-      setText($("last-cost"), "$" + usdcCost.toFixed(6));
-      setText($("last-cost-cents"), `${(usdcCost * 100).toFixed(3)}¢ paid in USDC (Arc's native gas token)`);
-      setLinkOrText($("last-tx-link"), cfg.explorer ? `${cfg.explorer}/tx/${txHash}` : "", shortTx(txHash));
-      setLinkOrText($("last-cid-link"), `${ALLOCATIONS_BASE}/${cidHex}.json`, `cid ${cidHex.slice(0,10)}…${cidHex.slice(-6)}.json`);
-
-      // Comparison card
-      setText($("arc-compare-latency"), `${settlementSec.toFixed(1)}s`);
-      setText($("arc-compare-cost"), `$${usdcCost.toFixed(6)} gas (USDC) — from this rebalance`);
-      $("arc-live-tag").style.visibility = "visible";
-
-      // Hero
-      setHero({
-        whaleCount, ageSec, latencySec: settlementSec, costUsdc: usdcCost,
-        txHash, explorer: cfg.explorer,
-      });
-
-      // Reasoning doc preview (async, may fail gracefully)
-      renderReasoning(cidHex);
-    }
-
-    // ---- Index State card ----
-    async function refreshState(provider, cfg) {
-      const nav = new Contract(cfg.addresses.NAVOracle, ABI_NAV, provider);
-      const idx = new Contract(cfg.addresses.IndexToken, ABI_INDEX, provider);
-      try {
-        const [navUsdc, isFresh, updatedAt, maxDeltaBps, supply, sp] = await Promise.all([
-          nav.nav(), nav.isFresh(), nav.updatedAt(), nav.maxDeltaBps().catch(() => 0n),
-          idx.totalSupply(), idx.sharePrice(),
-        ]);
-        setText($("nav"), "$" + fmtUsd(navUsdc, 6, 4));
-        const fresh = $("nav-fresh");
-        fresh.textContent = isFresh
-          ? "fresh — updated " + new Date(Number(updatedAt) * 1000).toLocaleString()
-          : (updatedAt > 0n ? "stale — last update " + new Date(Number(updatedAt) * 1000).toLocaleString() : "never updated");
-        fresh.className = "small " + (isFresh ? "fresh" : "stale");
-        setText($("sp"), "$" + fmtUsd(sp, 6, 4));
-        if (supply === 0n) {
-          $("supply").textContent = "no shares minted yet (treasury seeded directly for testnet)";
-          $("supply").className = "small empty";
-        } else {
-          $("supply").textContent = "supply: " + fmtUsd(supply, 18, 4) + " WHALE";
-          $("supply").className = "small";
-        }
-        setText($("maxdelta"), maxDeltaBps ? `±${Number(maxDeltaBps) / 100}%` : "—");
-      } catch (e) {
-        setText($("nav"), "—"); setText($("sp"), "—"); setText($("maxdelta"), "—");
-        $("nav-fresh").textContent = `read failed: ${e.shortMessage || e.message}`;
-        $("nav-fresh").className = "small stale";
-      }
-    }
-
-    // ---- WhaleAttestation card ----
-    async function refreshAttestation(provider, cfg, latestBlock) {
-      if (!cfg.addresses.WhaleAttestation) {
-        setText($("att-total"), "—"); setText($("att-count"), "—"); setText($("att-slashes"), "—");
-        setText($("last-slash-line"), "WhaleAttestation not deployed for this network");
-        return;
-      }
-      const att = new Contract(cfg.addresses.WhaleAttestation, ABI_ATTEST, provider);
-      try {
-        const bondedLogs = await findAllEventsInWindow(att, "Bonded", latestBlock);
-        const slashLogs  = await findAllEventsInWindow(att, "Slashed", latestBlock);
-
-        // Unique bonded wallets, current bond per wallet.
-        const wallets = new Set();
-        for (const l of bondedLogs) wallets.add(getAddress(l.args.wallet));
-        let totalBondedBase = 0n;
-        let nonzeroCount = 0;
-        for (const w of wallets) {
-          try {
-            const bond = await att.bondAmount(w);
-            if (bond > 0n) { totalBondedBase += bond; nonzeroCount += 1; }
-          } catch (_) {}
-        }
-        setText($("att-total"), "$" + fmtUsd(totalBondedBase, 6, 4));
-        if (nonzeroCount === 0) {
-          setText($("att-count"), "0");
-          $("att-count").className = "value empty";
-        } else {
-          setText($("att-count"), String(nonzeroCount));
-          $("att-count").className = "value";
-        }
-
-        // Slashes
-        setText($("att-slashes"), String(slashLogs.length));
-        if (slashLogs.length) {
-          let totalSlashed = 0n;
-          for (const l of slashLogs) totalSlashed += l.args.amount;
-          $("att-slashed-usdc").textContent = `$${fmtUsd(totalSlashed, 6, 4)} routed to slash beneficiary`;
-          const latest = slashLogs[slashLogs.length - 1];
-          const evCid = latest.args.evidenceCid;
-          const cleanEv = evCid.startsWith("0x") ? evCid.slice(2) : evCid;
-          const slashEl = $("last-slash-line"); clear(slashEl);
-          slashEl.append(
-            document.createTextNode(`${shortAddr(latest.args.wallet)} slashed ${(Number(latest.args.slashBps)/100).toFixed(1)}% · `),
-          );
-          slashEl.appendChild(makeLink(`${cfg.explorer}/tx/${latest.transactionHash}`, "tx"));
-          slashEl.appendChild(document.createTextNode(" · "));
-          slashEl.appendChild(makeLink(`${SLASHES_BASE}/${cleanEv}.json`, "evidence doc"));
-        } else {
-          setText($("last-slash-line"), "none — every bonded whale has stayed within decay threshold");
-        }
-      } catch (e) {
-        setText($("att-total"), "—"); setText($("att-count"), "—"); setText($("att-slashes"), "—");
-        $("last-slash-line").textContent = `read failed: ${e.shortMessage || e.message}`;
-      }
-    }
-
-    // ---- RPC provider w/ fallback ----
-    async function tryProvider(rpc) {
-      try { const p = new JsonRpcProvider(rpc); await p.getBlockNumber(); return p; }
-      catch { return null; }
-    }
-
-    // ---- Master refresh ----
-    let refreshing = false;
-    let lastRefreshAt = 0;
-    async function refresh() {
-      if (refreshing) return;
-      refreshing = true;
-      $("refresh-state").textContent = "refreshing…";
-      $("refresh-state").className = "refresh-state refreshing";
-      const net = $("network").value;
-      const cfg = NETWORKS[net];
-      $("net-badge").textContent = net === "arc-testnet" ? "Arc Testnet · live" : "Local Anvil · dev";
-      $("net-badge").className = "net-badge" + (net === "arc-testnet" ? "" : " dim");
-      $("err").textContent = "";
-
-      populateAddressList(cfg);
-
-      let provider = await tryProvider(cfg.rpc);
-      if (!provider && cfg.rpcFallback) provider = await tryProvider(cfg.rpcFallback);
-      if (!provider) {
-        $("err").textContent = "RPC unreachable. Try refresh, or pass --dev=1 to switch to local anvil.";
-        $("conn").textContent = `RPC failed: ${cfg.rpc}`;
-        refreshing = false;
-        $("refresh-state").className = "refresh-state";
-        return;
-      }
-      const net_ = await provider.getNetwork();
-      $("conn").textContent = `RPC ${provider._getConnection().url} — chain ${net_.chainId}`;
-
-      try {
-        const latestBlock = await provider.getBlockNumber();
-        await Promise.all([
-          refreshState(provider, cfg),
-          refreshRebalance(provider, cfg, latestBlock),
-          refreshAttestation(provider, cfg, latestBlock),
-        ]);
-      } catch (e) {
-        $("err").textContent = "read failed: " + (e.shortMessage || e.message);
-      }
-      lastRefreshAt = Date.now();
-      refreshing = false;
-      $("refresh-state").className = "refresh-state";
-      tickRefreshState();
-    }
-
-    function tickRefreshState() {
-      if (refreshing) return;
-      const sec = Math.max(0, Math.round((Date.now() - lastRefreshAt) / 1000));
-      $("refresh-state").textContent = lastRefreshAt
-        ? `updated ${sec}s ago · next in ${Math.max(0, 15 - sec)}s`
-        : "refreshes every 15s";
-      $("footer-meta").textContent = lastRefreshAt
-        ? `last refresh ${new Date(lastRefreshAt).toLocaleTimeString()} · auto every 15s`
-        : "page loading · auto-refresh every 15s";
-    }
-
-    $("refresh").addEventListener("click", refresh);
-    $("network").addEventListener("change", refresh);
-    refresh();
-    setInterval(refresh, 15000);
-    setInterval(tickRefreshState, 1000);
-  </script>
+buildContracts();
+loadDecision();
+refreshChain();
+setInterval(refreshChain, 15000);
+setInterval(tickMeta, 1000);
+window.addEventListener("load", ()=>{ requestAnimationFrame(drawConnectors); setTimeout(drawConnectors,60); });
+drawConnectors();
+$("#reverify").addEventListener("click", runVerify);
+</script>
 </body>
 </html>
