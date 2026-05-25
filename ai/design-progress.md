@@ -24,10 +24,15 @@ phase_3: completed
 selected: "hybrid: Proposal 3 (The Pipeline) as base + Proposal 2's Crimson Pro thesis hero on landing. Proposal 1's dense decision-ledger becomes the expandable full-record detail view."
 selection_rationale: "P3 makes the 4-agent chain the hero = our 'audit the agent' whitespace + best for agentic/innovation judging. P2's serif thesis is ownable authority in a sans/mono category. Combine the signature visual with the persuasion voice."
 
-phase_4: in_progress
-audit_result:
-issues_fixed:
-production_target: docs/index.html (replace current viewer; wire hybrid design to live Arc RPC + decision-latest.json + attestation + NET-NEW wallet buyer flow)
+phase_4: completed
+audit_result: pass
+issues_fixed: 2 (settlement-cell wrapping on held cycle; NAV total-vs-per-share pill label)
+production_target: docs/index.html — hybrid built + wired to live Arc RPC + decision-latest.json + attestation + wallet buyer flow
+
+phase_5: completed
+qa_result: APPROVED (with caveat)
+qa_automated: "0 emojis · 0 transition:all · 0 gradient text · DM Sans+Crimson Pro+JetBrains Mono loaded · prefers-reduced-motion honored · tabular-nums x19 · no missing element ids"
+qa_caveat: "Buyer WRITE path (connect/approve/buy/redeem) is wired but NOT live-executed — needs a funded browser wallet on Arc to verify. Read path (NAV, decision, attestation, contracts) verified live via local render against real Arc RPC."
 
 phase_5: pending
 qa_result:
