@@ -4,149 +4,224 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#0a0e14">
-  <title>WhaleIndex — USDC index on Arc, mirroring HL whales with on-chain provenance</title>
-  <meta name="description" content="A USDC-denominated index on Arc that mirrors top Hyperliquid whales. Every rebalance has an on-chain hash linking to the agent's reasoning. Sub-second settlement.">
+  <title>WhaleIndex — USDC index on Arc, mirroring Hyperliquid whales with on-chain provenance</title>
+  <meta name="description" content="A USDC-denominated index on Arc that mirrors top Hyperliquid whales. Every rebalance posts a content hash on chain that resolves to the agent's reasoning. Live demo on Arc Testnet.">
 
   <style>
     :root {
       color-scheme: dark;
       --bg: #0a0e14;
       --bg-card: #0e131a;
+      --bg-card-2: #131922;
       --border: #1f2630;
-      --border-hi: #2e3849;
+      --border-hi: #3a4555;
       --fg: #e6edf3;
-      --fg-dim: #8a95a3;
-      --fg-mute: #6b7785;
+      --fg-dim: #a0acba;     /* ≈5.8:1 on card bg (was #8a95a3) — passes AA */
+      --fg-mute: #9aa5b3;    /* ≈6.6:1 on card bg (was #6b7785) — passes AA */
       --accent: #6cd16c;
+      --accent-dim: #2a5230;
       --warn: #d97757;
       --link: #7cc7ff;
+      --code-bg: #161c25;
     }
     * { box-sizing: border-box; }
     html, body {
       margin: 0; padding: 0;
       background: var(--bg); color: var(--fg);
-      font: 14px/1.55 -apple-system, ui-monospace, SFMono-Regular, Menlo, monospace;
+      font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
     }
     a { color: var(--link); text-decoration: none; border-bottom: 1px dotted var(--border-hi); }
-    a:hover { border-bottom-color: var(--link); }
-    main { max-width: 880px; margin: 0 auto; padding: 28px 18px 80px; }
-    .header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; margin-bottom: 4px; }
-    h1 { font-size: 18px; margin: 0; font-weight: 600; letter-spacing: .02em; }
+    a:hover, a:focus { border-bottom-color: var(--link); outline: none; }
+    a:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; border-radius: 2px; }
+    button { cursor: pointer; }
+    button:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+    code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, "Cascadia Mono", monospace; }
+    code { background: var(--code-bg); padding: 1px 6px; border-radius: 4px; font-size: 12px; word-break: break-all; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+    main { max-width: 920px; margin: 0 auto; padding: 28px 18px 80px; }
+
+    /* HEADER */
+    .header-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+    h1 { font-size: 20px; margin: 0; font-weight: 700; letter-spacing: -.01em; }
     .net-badge {
-      font-size: 11px; padding: 2px 8px; border-radius: 4px;
-      background: #14241a; color: var(--accent); border: 1px solid #1f3a26;
+      font-size: 11px; padding: 3px 10px; border-radius: 12px;
+      background: #14241a; color: var(--accent); border: 1px solid var(--accent-dim);
+      font-weight: 500;
     }
-    .pitch { color: var(--fg-dim); font-size: 13px; margin: 6px 0 22px; max-width: 640px; }
-    .pitch strong { color: var(--fg); font-weight: 500; }
-    .card {
+    .net-badge.dim { background: #1c1f25; color: var(--fg-mute); border-color: var(--border); }
+    .pitch { color: var(--fg-dim); font-size: 14px; margin: 8px 0 24px; max-width: 680px; line-height: 1.6; }
+    .pitch strong { color: var(--fg); font-weight: 600; }
+
+    /* HERO HEADLINE METRIC */
+    .hero {
+      padding: 22px 24px; margin-bottom: 18px;
+      border: 1px solid var(--accent-dim); border-radius: 10px;
+      background: linear-gradient(180deg, #0f1a14 0%, var(--bg-card) 100%);
+    }
+    .hero-eyebrow { color: var(--accent); font-size: 11px; text-transform: uppercase; letter-spacing: .12em; font-weight: 600; margin-bottom: 8px; }
+    .hero-line { font-size: 17px; line-height: 1.55; color: var(--fg); font-weight: 500; }
+    .hero-line strong { font-weight: 700; color: var(--fg); }
+    .hero-line .v { color: var(--accent); font-weight: 700; }
+    .hero-cta { margin-top: 12px; font-size: 12px; color: var(--fg-dim); }
+
+    /* CARDS */
+    section.card {
       border: 1px solid var(--border); border-radius: 8px;
-      padding: 18px 20px; margin-bottom: 12px;
+      padding: 18px 22px; margin-bottom: 12px;
       background: var(--bg-card);
     }
-    .card-title {
+    section.card > h2 {
       color: var(--fg-mute); font-size: 11px; text-transform: uppercase;
-      letter-spacing: .08em; margin-bottom: 12px;
+      letter-spacing: .08em; margin: 0 0 12px; font-weight: 600;
     }
     .row { display: flex; gap: 22px; flex-wrap: wrap; }
     .row > div { flex: 1; min-width: 160px; }
-    .label { color: var(--fg-mute); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px; }
+    .label { color: var(--fg-mute); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px; font-weight: 500; }
     .value { font-size: 22px; font-weight: 500; color: var(--fg); line-height: 1.2; }
     .value.big { font-size: 28px; }
-    .small { font-size: 12px; color: var(--fg-dim); margin-top: 4px; word-break: break-all; }
-    .small.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .small { font-size: 12px; color: var(--fg-dim); margin-top: 4px; word-break: break-word; line-height: 1.5; }
+    .small.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
     .fresh { color: var(--accent); }
     .stale { color: var(--warn); }
-    .controls { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
-    select, button {
-      background: #161c25; color: var(--fg); border: 1px solid var(--border);
-      border-radius: 6px; padding: 6px 12px; font: inherit; cursor: pointer;
+    .empty { color: var(--fg-mute); font-style: italic; }
+
+    /* CONTROLS */
+    .controls { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+    .controls select, .controls button {
+      background: var(--code-bg); color: var(--fg); border: 1px solid var(--border);
+      border-radius: 6px; padding: 7px 12px; font: 13px/1 inherit;
     }
-    button:hover, select:hover { border-color: var(--border-hi); }
-    code { background: #161c25; padding: 1px 6px; border-radius: 4px; font-size: 12px; word-break: break-all; }
-    .err { color: var(--warn); font-size: 12px; margin-top: 6px; word-break: break-all; }
+    .controls button:hover, .controls select:hover { border-color: var(--border-hi); }
+    .refresh-state { font-size: 11px; color: var(--fg-mute); margin-left: auto; }
+    .refresh-state.refreshing { color: var(--accent); }
+
+    /* SKELETON LOADER */
+    .skel {
+      display: inline-block; height: 1em; border-radius: 4px;
+      background: linear-gradient(90deg, var(--code-bg), var(--bg-card-2), var(--code-bg));
+      background-size: 200% 100%;
+      animation: shimmer 1.4s ease-in-out infinite;
+    }
+    .skel.w-sm { width: 60px; } .skel.w-md { width: 120px; } .skel.w-lg { width: 200px; } .skel.w-xl { width: 280px; }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    @media (prefers-reduced-motion: reduce) { .skel { animation: none; opacity: 0.6; } }
+
+    /* COMPARISON */
     .compare-grid {
-      display: grid; gap: 10px;
+      display: grid; gap: 10px; margin-top: 4px;
       grid-template-columns: repeat(3, 1fr);
     }
     .compare {
-      padding: 12px; border: 1px solid var(--border); border-radius: 6px;
+      padding: 14px; border: 1px solid var(--border); border-radius: 6px;
       background: rgba(255,255,255,0.012);
     }
-    .compare h4 { margin: 0 0 6px; font-size: 12px; font-weight: 600; color: var(--fg); }
-    .compare .stat { font-size: 18px; color: var(--accent); }
+    .compare.lead { border-color: var(--accent-dim); background: #0f1a14; }
+    .compare h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--fg); }
+    .compare h3 .live { font-size: 10px; color: var(--accent); font-weight: 500; margin-left: 6px; letter-spacing: .04em; }
+    .compare .stat { font-size: 20px; color: var(--accent); font-weight: 600; }
     .compare .stat.dim { color: var(--fg-mute); }
-    .compare .note { font-size: 11px; color: var(--fg-mute); margin-top: 4px; }
-    .addr-list { display: grid; grid-template-columns: 1fr auto; gap: 6px 14px; font-size: 12px; }
+    .compare .note { font-size: 11px; color: var(--fg-mute); margin-top: 4px; line-height: 1.45; }
+
+    /* ADDR LIST */
+    .addr-list { display: grid; grid-template-columns: minmax(140px, max-content) 1fr auto; gap: 8px 14px; font-size: 12px; align-items: center; }
     .addr-list .k { color: var(--fg-mute); }
-    .addr-list .v { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
-    .footer { color: var(--fg-mute); font-size: 11px; margin-top: 24px; text-align: center; line-height: 1.7; }
+    .addr-list .v { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; min-width: 0; }
+    .addr-list .v a { display: inline-block; max-width: 100%; }
+    .copy-btn {
+      background: none; border: 1px solid var(--border); color: var(--fg-mute);
+      border-radius: 4px; padding: 2px 8px; font-size: 11px;
+      font-family: inherit; transition: all .15s;
+    }
+    .copy-btn:hover { color: var(--fg); border-color: var(--border-hi); }
+    .copy-btn.copied { color: var(--accent); border-color: var(--accent-dim); }
+
+    /* REASONING DOC */
+    .reasoning { margin-top: 12px; padding: 14px 16px; background: var(--bg-card-2); border-radius: 6px; border-left: 3px solid var(--accent); }
+    .reasoning-row { display: flex; gap: 12px; padding: 4px 0; font-size: 12px; align-items: baseline; }
+    .reasoning-row .agent { color: var(--accent); font-weight: 600; min-width: 100px; }
+    .reasoning-row .body { color: var(--fg-dim); flex: 1; }
+
+    /* WHALES TABLE */
+    .whales-tbl { font-size: 12px; }
+    .whales-tbl .whale-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; padding: 6px 0; border-top: 1px solid var(--border); align-items: center; }
+    .whales-tbl .whale-row:first-of-type { border-top: none; }
+    .whales-tbl .w-addr { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--fg-dim); }
+    .whales-tbl .w-status { font-size: 11px; padding: 2px 8px; border-radius: 4px; }
+    .whales-tbl .w-status.bonded { background: #14241a; color: var(--accent); border: 1px solid var(--accent-dim); }
+    .whales-tbl .w-status.unbonded { background: #1c1f25; color: var(--fg-mute); border: 1px solid var(--border); }
+    .whales-tbl .w-status.slashed { background: #2a1a14; color: var(--warn); border: 1px solid #50321f; }
+
+    /* ERROR */
+    .err { color: var(--warn); font-size: 12px; margin-top: 6px; word-break: break-all; }
+
+    /* FOOTER */
+    .footer { color: var(--fg-mute); font-size: 11px; margin-top: 28px; text-align: center; line-height: 1.7; }
     .footer a { color: var(--fg-dim); }
-    @media (max-width: 600px) {
-      main { padding: 20px 14px 60px; }
+    .footer-meta { margin-top: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; opacity: .8; }
+
+    /* MOBILE */
+    @media (max-width: 700px) {
+      main { padding: 22px 14px 60px; }
       .compare-grid { grid-template-columns: 1fr; }
       .value.big { font-size: 22px; }
-      .row > div { min-width: 140px; }
+      .hero-line { font-size: 15px; }
+      .addr-list { grid-template-columns: minmax(120px, max-content) 1fr; gap: 4px 12px; }
+      .addr-list .copy-btn { grid-column: 2; justify-self: start; margin-top: 2px; }
+      .whales-tbl .whale-row { grid-template-columns: 1fr auto; }
+      .whales-tbl .w-status { grid-column: 2; }
     }
   </style>
 </head>
 <body>
-  <main>
-    <div class="header">
-      <h1>WhaleIndex</h1>
-      <span class="net-badge" id="net-badge">Arc Testnet</span>
-    </div>
-    <div class="pitch">
+  <main aria-labelledby="page-title">
+    <header class="header-row">
+      <h1 id="page-title">WhaleIndex</h1>
+      <span class="net-badge" id="net-badge">Arc Testnet · live</span>
+    </header>
+    <p class="pitch">
       <strong>A USDC-denominated index on Arc that mirrors top Hyperliquid whales.</strong>
-      Every rebalance posts a content hash on chain that resolves to the agent's reasoning document — provenance, not trust.
-      Settlement under 2 seconds. Cost under a cent.
-    </div>
+      Every rebalance posts a content hash on chain that resolves to the agent's full reasoning document — provenance, not trust.
+      The signal sources opt in with a USDC bond; the agent slashes them if they decay.
+    </p>
+
+    <!-- HERO: the 5-second story. Filled in by JS from the latest AllocationDecided. -->
+    <section class="hero" aria-labelledby="hero-h">
+      <h2 id="hero-h" class="hero-eyebrow">Live status</h2>
+      <p class="hero-line" id="hero-line" aria-live="polite">
+        <span class="skel w-xl"></span>
+      </p>
+      <p class="hero-cta" id="hero-cta">Loading the latest on-chain rebalance…</p>
+    </section>
 
     <div class="controls">
-      <select id="network">
-        <option value="arc-testnet" selected>arc testnet (V2, live)</option>
-        <option value="local">local anvil (V1 dev)</option>
+      <select id="network" aria-label="Network">
+        <option value="arc-testnet" selected>Arc Testnet (V3, live)</option>
+        <option value="local" id="opt-local" hidden>Local anvil (dev)</option>
       </select>
-      <button id="refresh">refresh</button>
+      <button id="refresh" type="button" aria-label="Refresh data now">refresh</button>
+      <span class="refresh-state" id="refresh-state" aria-live="polite">refreshes every 15s</span>
     </div>
 
-    <div class="card">
-      <div class="card-title">Index State</div>
-      <div class="row">
-        <div>
-          <div class="label">NAV (USDC)</div>
-          <div class="value big" id="nav">—</div>
-          <div class="small" id="nav-fresh">loading…</div>
-        </div>
-        <div>
-          <div class="label">Share Price (USDC / WHALE)</div>
-          <div class="value" id="sp">—</div>
-          <div class="small" id="supply">—</div>
-        </div>
-        <div>
-          <div class="label">Max NAV Delta / Update</div>
-          <div class="value" id="maxdelta">—</div>
-          <div class="small">on-chain bound; reverts beyond</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Most Recent Rebalance</div>
+    <!-- LATEST REBALANCE -->
+    <section class="card" aria-labelledby="rebalance-h">
+      <h2 id="rebalance-h">Latest rebalance</h2>
       <div class="row">
         <div>
           <div class="label">Routed</div>
-          <div class="value" id="last-amount">—</div>
-          <div class="small" id="last-venue">—</div>
+          <div class="value" id="last-amount"><span class="skel w-md"></span></div>
+          <div class="small" id="last-venue"></div>
         </div>
         <div>
-          <div class="label">Settlement Latency</div>
-          <div class="value" id="last-latency">—</div>
-          <div class="small">Arc deterministic finality</div>
+          <div class="label">Settlement</div>
+          <div class="value" id="last-latency"><span class="skel w-sm"></span></div>
+          <div class="small">measured: send → receipt</div>
         </div>
         <div>
-          <div class="label">Gas Cost (USDC)</div>
-          <div class="value" id="last-cost">—</div>
-          <div class="small" id="last-cost-cents">cents</div>
+          <div class="label">Gas cost</div>
+          <div class="value" id="last-cost"><span class="skel w-sm"></span></div>
+          <div class="small" id="last-cost-cents"></div>
         </div>
       </div>
       <div class="small mono" style="margin-top:14px;">
@@ -154,62 +229,127 @@
         <span id="last-tx-link">—</span>
       </div>
       <div class="small mono" style="margin-top:4px;">
-        <span class="label" style="display:inline; margin-right:8px;">REASONING</span>
+        <span class="label" style="display:inline; margin-right:8px;">PROVENANCE</span>
         <span id="last-cid-link">—</span>
       </div>
-    </div>
+    </section>
 
-    <div class="card">
-      <div class="card-title">Why Arc — Same Rebalance, Different Chains</div>
+    <!-- AGENT REASONING (rendered from the CID-resolved JSON) -->
+    <section class="card" aria-labelledby="reason-h">
+      <h2 id="reason-h">The agent's reasoning (this cycle)</h2>
+      <div id="reasoning-area" aria-live="polite">
+        <p class="small empty">Loading allocation document…</p>
+      </div>
+    </section>
+
+    <!-- WHALE ATTESTATION -->
+    <section class="card" aria-labelledby="attest-h">
+      <h2 id="attest-h">Skin-in-the-game · bonded whales</h2>
+      <div class="row">
+        <div>
+          <div class="label">Total bonded</div>
+          <div class="value" id="att-total"><span class="skel w-sm"></span></div>
+          <div class="small">USDC locked in attestation escrow</div>
+        </div>
+        <div>
+          <div class="label">Bonded whales</div>
+          <div class="value" id="att-count"><span class="skel w-sm"></span></div>
+          <div class="small">unique addresses with active bonds</div>
+        </div>
+        <div>
+          <div class="label">Lifetime slashes</div>
+          <div class="value" id="att-slashes"><span class="skel w-sm"></span></div>
+          <div class="small" id="att-slashed-usdc"></div>
+        </div>
+      </div>
+      <div class="small mono" style="margin-top:14px;">
+        <span class="label" style="display:inline; margin-right:8px;">LATEST SLASH</span>
+        <span id="last-slash-line">—</span>
+      </div>
+    </section>
+
+    <!-- COMPARISON -->
+    <section class="card" aria-labelledby="compare-h">
+      <h2 id="compare-h">Why Arc — same rebalance, different chains</h2>
       <div class="compare-grid">
-        <div class="compare">
-          <h4>Arc Testnet</h4>
-          <div class="stat" id="arc-compare-latency">~1s</div>
-          <div class="note" id="arc-compare-cost">≈ $0.0005 gas (USDC)</div>
-          <div class="note">Deterministic finality</div>
+        <div class="compare lead">
+          <h3>Arc Testnet <span class="live" id="arc-live-tag">live</span></h3>
+          <div class="stat" id="arc-compare-latency"><span class="skel w-sm"></span></div>
+          <div class="note" id="arc-compare-cost"><span class="skel w-md"></span></div>
+          <div class="note">Deterministic finality. USDC is the gas token.</div>
         </div>
         <div class="compare">
-          <h4>Arbitrum One</h4>
+          <h3>Arbitrum One</h3>
           <div class="stat dim">~2s</div>
-          <div class="note">≈ $0.20-0.30 gas (ETH)</div>
-          <div class="note">7-day fraud window</div>
+          <div class="note">≈ $0.20–0.30 gas (ETH)</div>
+          <div class="note">7-day fraud window before finality.</div>
         </div>
         <div class="compare">
-          <h4>Ethereum L1</h4>
+          <h3>Ethereum L1</h3>
           <div class="stat dim">~12s</div>
-          <div class="note">≈ $4-8 gas (ETH)</div>
-          <div class="note">Probabilistic finality</div>
+          <div class="note">≈ $4–8 gas (ETH)</div>
+          <div class="note">Probabilistic finality.</div>
         </div>
       </div>
-    </div>
+      <p class="small" style="margin-top:10px;">
+        Arbitrum/Ethereum figures are typical-range estimates from public docs; Arc figures are derived from the latest on-chain rebalance.
+      </p>
+    </section>
 
-    <div class="card">
-      <div class="card-title">Verified Contracts (Arc Testnet)</div>
-      <div class="addr-list" id="addr-list"><div class="k">loading…</div><div class="v"></div></div>
-      <div class="small" style="margin-top:10px;">
-        All 7 contracts have verified source on
-        <a href="https://testnet.arcscan.app" target="_blank" rel="noopener">Arcscan</a>.
+    <!-- PROTOCOL STATE (engineering details) -->
+    <section class="card" aria-labelledby="state-h">
+      <h2 id="state-h">Protocol state</h2>
+      <div class="row">
+        <div>
+          <div class="label">NAV (USDC)</div>
+          <div class="value big" id="nav"><span class="skel w-md"></span></div>
+          <div class="small" id="nav-fresh"></div>
+        </div>
+        <div>
+          <div class="label">Share price (USDC / WHALE)</div>
+          <div class="value" id="sp"><span class="skel w-sm"></span></div>
+          <div class="small" id="supply"></div>
+        </div>
+        <div>
+          <div class="label">Max NAV delta per update</div>
+          <div class="value" id="maxdelta"><span class="skel w-sm"></span></div>
+          <div class="small">on-chain bound; reverts beyond</div>
+        </div>
       </div>
-    </div>
+    </section>
 
-    <div class="card">
-      <div class="card-title">Connection</div>
+    <!-- VERIFIED CONTRACTS -->
+    <section class="card" aria-labelledby="contracts-h">
+      <h2 id="contracts-h">Verified contracts (Arc Testnet)</h2>
+      <div class="addr-list" id="addr-list" role="list"></div>
+      <p class="small" style="margin-top:12px;">
+        All contracts have verified source on
+        <a href="https://testnet.arcscan.app" target="_blank" rel="noopener">Arcscan</a>.
+        Bytecode + ABI public.
+      </p>
+    </section>
+
+    <!-- CONNECTION (footer-ish) -->
+    <section class="card" aria-labelledby="conn-h">
+      <h2 id="conn-h">Connection</h2>
       <div class="small mono" id="conn">connecting…</div>
-      <div class="err" id="err"></div>
-    </div>
+      <div class="err" id="err" aria-live="assertive"></div>
+    </section>
 
-    <div class="footer">
-      Source: <a href="https://github.com/Yonkoo11/whaleindex" target="_blank" rel="noopener">github.com/Yonkoo11/whaleindex</a>
-      · Built for the <a href="https://agora.thecanteenapp.com" target="_blank" rel="noopener">Agora Agents Hackathon</a>
-      · MIT licensed
-    </div>
+    <footer class="footer">
+      <div>
+        Source: <a href="https://github.com/Yonkoo11/whaleindex" target="_blank" rel="noopener">github.com/Yonkoo11/whaleindex</a>
+        · Built for the <a href="https://agora.thecanteenapp.com" target="_blank" rel="noopener">Agora Agents Hackathon</a>
+        · MIT licensed
+      </div>
+      <div class="footer-meta" id="footer-meta">page loaded · refreshes every 15s</div>
+    </footer>
   </main>
 
   <script type="module">
-    import { JsonRpcProvider, Contract, formatUnits } from "https://esm.sh/ethers@6.13.4";
+    import { JsonRpcProvider, Contract, formatUnits, getAddress, EventLog } from "https://esm.sh/ethers@6.13.4";
 
-    // V2 deployment on Arc testnet (chain 5042002), real native USDC + safety primitives.
-    // RPC: keyless public endpoint so any visitor sees live state without their own canteen token.
+    // ---- Network config ----
     const NETWORKS = {
       "arc-testnet": {
         rpc: "https://rpc.testnet.arc.network",
@@ -227,13 +367,10 @@
           TokenMessenger:     "0x2522423855550e82016103c79F097042Cf2d5a0B",
           USYC:               "0x2B540589EAF231b930Ed5D53ee3CE292904ccb2d",
         },
-        // Real CCTP TokenMessenger (the operator burns through this in off-chain mode).
         realCctpMessenger:    "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA",
       },
       "local": {
-        rpc: "http://127.0.0.1:8545",
-        chainId: 31337,
-        explorer: "",
+        rpc: "http://127.0.0.1:8545", chainId: 31337, explorer: "",
         addresses: {
           NAVOracle:  "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
           IndexToken: "0x0165878A594ca255338adfa4d48449f69242Eb8F",
@@ -242,9 +379,15 @@
         },
       },
     };
-
     const ALLOCATIONS_BASE = "https://yonkoo11.github.io/whaleindex/allocations";
+    const SLASHES_BASE     = "https://yonkoo11.github.io/whaleindex/slashes";
 
+    // ---- Reveal dev-only options when ?dev=1 ----
+    if (new URLSearchParams(location.search).get("dev") === "1") {
+      document.getElementById("opt-local").hidden = false;
+    }
+
+    // ---- ABIs (minimal — only what we read) ----
     const ABI_NAV = [
       "function nav() view returns (uint256)",
       "function isFresh() view returns (bool)",
@@ -255,11 +398,20 @@
       "function totalSupply() view returns (uint256)",
       "function sharePrice() view returns (uint256)",
     ];
+    const ABI_EXEC = [
+      "event AllocationDecided(bytes32 indexed cid, uint16 whaleCount, uint64 reportedAt)",
+      "event RebalanceCommitted(uint256 indexed burnId, uint64 cctpNonce, uint256 navAfter, uint64 reportedAt)",
+      "event RebalanceExecuted(uint32 indexed destinationDomain, bytes32 indexed mintRecipient, uint256 usdcOut, uint256 navAfter, uint64 reportedAt)",
+    ];
     const ABI_ROUTER = [
       "event Routed(uint64 indexed nonce, uint32 indexed destinationDomain, bytes32 mintRecipient, uint256 amount, uint256 maxFee, uint32 minFinalityThreshold)",
     ];
-    const ABI_EXEC = [
-      "event AllocationDecided(bytes32 indexed cid, uint16 whaleCount, uint64 reportedAt)",
+    const ABI_ATTEST = [
+      "function bondAmount(address) view returns (uint256)",
+      "function isBonded(address) view returns (bool)",
+      "function maxSlashBps() view returns (uint256)",
+      "event Bonded(address indexed wallet, uint256 amount, uint256 totalBond)",
+      "event Slashed(address indexed wallet, uint256 amount, uint16 slashBps, bytes32 evidenceCid)",
     ];
 
     const DOMAINS = {
@@ -267,157 +419,443 @@
       5: "Solana", 6: "Base", 7: "Polygon", 10: "Unichain", 26: "Arc Testnet",
     };
 
+    // ---- Helpers ----
     const $ = (id) => document.getElementById(id);
-    const fmt = (raw, dec, frac = 4) =>
+    const fmtUsd = (raw, dec, frac = 4) =>
       Number(formatUnits(raw, dec)).toLocaleString(undefined, { maximumFractionDigits: frac });
-
-    function shortHash(h) { return h.slice(0, 10) + "…" + h.slice(-6); }
-
+    const shortAddr = (a) => a.slice(0, 8) + "…" + a.slice(-6);
+    const shortTx = (h) => h.slice(0, 10) + "…" + h.slice(-6);
+    const fmtAgo = (sec) => {
+      if (sec < 60) return `${Math.round(sec)}s ago`;
+      if (sec < 3600) return `${Math.round(sec/60)}m ago`;
+      if (sec < 86400) return `${Math.round(sec/3600)}h ago`;
+      return `${Math.round(sec/86400)}d ago`;
+    };
     function makeLink(href, text) {
       const a = document.createElement("a");
-      a.href = href;
-      a.textContent = text;
-      a.target = "_blank";
-      a.rel = "noopener";
+      a.href = href; a.textContent = text;
+      a.target = "_blank"; a.rel = "noopener";
       return a;
     }
-
-    function setLinkOrText(el, href, text) {
-      el.replaceChildren(href ? makeLink(href, text) : document.createTextNode(text));
+    function clear(el) { while (el.firstChild) el.removeChild(el.firstChild); }
+    function setText(el, txt) { clear(el); el.appendChild(document.createTextNode(txt)); }
+    function setLinkOrText(el, href, text, cls = "") {
+      clear(el);
+      if (href) el.appendChild(makeLink(href, text));
+      else el.appendChild(document.createTextNode(text));
+      if (cls) el.className = cls;
     }
 
+    // ---- Address list (with copy buttons) ----
     function populateAddressList(cfg) {
       const grid = $("addr-list");
-      grid.replaceChildren();
-      for (const [k, v] of Object.entries(cfg.addresses)) {
+      clear(grid);
+      const realCCTP = cfg.realCctpMessenger
+        ? [["RealCCTP V2", cfg.realCctpMessenger, "Circle's actual CCTP — operator burns through this in off-chain mode"]]
+        : [];
+      const entries = [
+        ...Object.entries(cfg.addresses).map(([k, v]) => [k, v, ""]),
+        ...realCCTP,
+      ];
+      for (const [k, v, note] of entries) {
         const kDiv = document.createElement("div"); kDiv.className = "k"; kDiv.textContent = k;
         const vDiv = document.createElement("div"); vDiv.className = "v";
-        if (cfg.explorer) {
-          vDiv.appendChild(makeLink(`${cfg.explorer}/address/${v}`, v));
-        } else {
-          vDiv.textContent = v;
+        const link = cfg.explorer
+          ? makeLink(`${cfg.explorer}/address/${v}`, window.innerWidth < 700 ? shortAddr(v) : v)
+          : document.createTextNode(v);
+        vDiv.appendChild(link);
+        if (note) {
+          const noteEl = document.createElement("div");
+          noteEl.className = "small";
+          noteEl.style.marginTop = "2px";
+          noteEl.textContent = note;
+          vDiv.appendChild(noteEl);
         }
-        grid.append(kDiv, vDiv);
+        const btn = document.createElement("button");
+        btn.className = "copy-btn"; btn.type = "button";
+        btn.setAttribute("aria-label", `Copy ${k} address`);
+        btn.textContent = "copy";
+        btn.addEventListener("click", async () => {
+          try { await navigator.clipboard.writeText(v); btn.textContent = "copied"; btn.classList.add("copied"); }
+          catch { btn.textContent = "select+⌘C"; }
+          setTimeout(() => { btn.textContent = "copy"; btn.classList.remove("copied"); }, 1500);
+        });
+        grid.append(kDiv, vDiv, btn);
       }
     }
 
+    // ---- Chunked event scan: walks back in 9K-block chunks up to ~24h ----
+    async function findLatestEvent(contract, eventName, latestBlock, chunkSize = 9_000, maxChunks = 10) {
+      for (let i = 0; i < maxChunks; i++) {
+        const to = latestBlock - i * chunkSize;
+        const from = Math.max(0, to - chunkSize + 1);
+        try {
+          const logs = await contract.queryFilter(eventName, from, to);
+          if (logs.length) return logs[logs.length - 1];
+        } catch (_) { /* RPC chunk error, try next window */ }
+        if (from === 0) break;
+      }
+      return null;
+    }
+    async function findAllEventsInWindow(contract, eventName, latestBlock, chunkSize = 9_000, maxChunks = 10) {
+      const all = [];
+      for (let i = 0; i < maxChunks; i++) {
+        const to = latestBlock - i * chunkSize;
+        const from = Math.max(0, to - chunkSize + 1);
+        try {
+          const logs = await contract.queryFilter(eventName, from, to);
+          all.push(...logs);
+        } catch (_) { /* skip */ }
+        if (from === 0) break;
+      }
+      return all;
+    }
+
+    // ---- Hero updater (the 5-second story) ----
+    function setHero({ whaleCount, ageSec, latencySec, costUsdc, txHash, explorer }) {
+      const line = $("hero-line"); clear(line);
+      if (whaleCount === null) {
+        setText(line, "No rebalance recorded yet — orchestrator runs against the watchlist daily.");
+        $("hero-cta").textContent = "Trigger the agentic loop locally via scripts/orchestrate-arc.sh.";
+        return;
+      }
+      const span = (cls, txt) => {
+        const s = document.createElement("span"); s.className = cls; s.textContent = txt; return s;
+      };
+      line.append(
+        document.createTextNode("Mirroring "),
+        span("v", `${whaleCount} ${whaleCount === 1 ? "whale" : "whales"}`),
+        document.createTextNode(" · last rebalanced "),
+        span("v", fmtAgo(ageSec)),
+        document.createTextNode(" · settled in "),
+        span("v", `${latencySec.toFixed(2)}s`),
+        document.createTextNode(" on Arc · gas cost "),
+        span("v", `$${costUsdc.toFixed(4)}`),
+      );
+      const cta = $("hero-cta"); clear(cta);
+      cta.appendChild(document.createTextNode("Verify: "));
+      cta.appendChild(makeLink(`${explorer}/tx/${txHash}`, "tx on Arcscan"));
+      cta.appendChild(document.createTextNode(" · "));
+      cta.appendChild(makeLink("#rebalance-h", "see the rebalance details below"));
+    }
+
+    // ---- Reasoning doc inline preview ----
+    async function renderReasoning(cidHex) {
+      const area = $("reasoning-area"); clear(area);
+      const cleanCid = cidHex.startsWith("0x") ? cidHex.slice(2) : cidHex;
+      const url = `${ALLOCATIONS_BASE}/${cleanCid}.json`;
+      try {
+        const r = await fetch(url, { cache: "no-store" });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const doc = await r.json();
+        const decision = doc.decision || {};
+        const audit = decision.multi_agent_audit || {};
+        const proposals = (audit.allocator && audit.allocator.proposals) || [];
+        const verdicts = (audit.risk && audit.risk.verdicts) || [];
+        const scores = (audit.scorer && audit.scorer.scores) || [];
+
+        const intro = document.createElement("p");
+        intro.className = "small";
+        intro.style.margin = "0 0 10px";
+        const choice = decision.chosen_proposal || "no choice";
+        intro.textContent = `Coordinator chose “${choice}” after a 4-agent vote. ${decision.coordinator_reasoning || ""}`;
+        area.appendChild(intro);
+
+        const wrap = document.createElement("div"); wrap.className = "reasoning";
+        const addRow = (agent, body) => {
+          const r = document.createElement("div"); r.className = "reasoning-row";
+          const a = document.createElement("div"); a.className = "agent"; a.textContent = agent;
+          const b = document.createElement("div"); b.className = "body"; b.textContent = body;
+          r.append(a, b); wrap.appendChild(r);
+        };
+        if (scores.length) {
+          const top = scores.slice(0, 3).map(s => `${shortAddr(s.wallet)} ${s.score.toFixed(1)}/100`).join(", ");
+          addRow("Scorer", `${scores.length} whales ranked. Top: ${top}.`);
+        }
+        if (proposals.length) {
+          const names = proposals.map(p => p.name).join(", ");
+          addRow("Allocator", `${proposals.length} proposals on the table: ${names}.`);
+        }
+        if (verdicts.length) {
+          const summary = verdicts.map(v => `${v.proposal_name}:${v.verdict.split("_")[0]}`).join("  ");
+          addRow("Risk", summary);
+        }
+        addRow("Coordinator", `Picked ${choice}.`);
+        area.appendChild(wrap);
+
+        const human = decision.human_reasoning;
+        if (human && !human.startsWith("(no LLM")) {
+          const llm = document.createElement("p");
+          llm.className = "small";
+          llm.style.marginTop = "12px";
+          llm.style.color = "var(--fg-dim)";
+          llm.textContent = `LLM summary: ${human}`;
+          area.appendChild(llm);
+        }
+        const docLink = document.createElement("p");
+        docLink.className = "small";
+        docLink.style.marginTop = "10px";
+        docLink.appendChild(document.createTextNode("Full canonical document: "));
+        docLink.appendChild(makeLink(url, `${cleanCid.slice(0, 10)}…${cleanCid.slice(-6)}.json`));
+        area.appendChild(docLink);
+      } catch (e) {
+        const p = document.createElement("p"); p.className = "small empty";
+        p.textContent = `Reasoning document for cid ${cleanCid.slice(0,10)}… not reachable yet (${e.message}).`;
+        area.appendChild(p);
+      }
+    }
+
+    // ---- Latest rebalance card + hero ----
+    async function refreshRebalance(provider, cfg, latestBlock) {
+      const exec = new Contract(cfg.addresses.RebalanceExecutor, ABI_EXEC, provider);
+      const router = new Contract(cfg.addresses.CCTPRouter, ABI_ROUTER, provider);
+
+      const alloc = await findLatestEvent(exec, "AllocationDecided", latestBlock);
+      if (!alloc) {
+        setHero({ whaleCount: null });
+        setText($("last-amount"), "no recent rebalances");
+        $("last-amount").className = "value empty";
+        setText($("last-venue"), "(searched ~24h of blocks)");
+        setText($("last-latency"), "—");
+        setText($("last-cost"), "—");
+        setText($("last-cost-cents"), "");
+        setText($("arc-compare-latency"), "—");
+        setText($("arc-compare-cost"), "no on-chain data yet");
+        $("arc-live-tag").style.visibility = "hidden";
+        setText($("last-tx-link"), "—");
+        setText($("last-cid-link"), "—");
+        clear($("reasoning-area"));
+        const p = document.createElement("p"); p.className = "small empty";
+        p.textContent = "No rebalance found in the last ~24h; once the orchestrator runs, the reasoning document will render here.";
+        $("reasoning-area").appendChild(p);
+        return;
+      }
+
+      const cid = alloc.args.cid;
+      const whaleCount = Number(alloc.args.whaleCount);
+      const reportedAt = Number(alloc.args.reportedAt);
+      const txHash = alloc.transactionHash;
+      const cidHex = cid.startsWith("0x") ? cid.slice(2) : cid;
+
+      // tx + receipt for cost + measured latency
+      const [tx, rcpt, blk] = await Promise.all([
+        provider.getTransaction(txHash),
+        provider.getTransactionReceipt(txHash),
+        provider.getBlock(alloc.blockNumber),
+      ]);
+
+      // Look for Routed event in the SAME tx (on-chain mode).
+      let routedAmount = null, routedDomain = null;
+      if (rcpt) {
+        for (const log of rcpt.logs) {
+          if (log.address.toLowerCase() === cfg.addresses.CCTPRouter.toLowerCase()) {
+            try {
+              const parsed = router.interface.parseLog(log);
+              if (parsed && parsed.name === "Routed") {
+                routedAmount = parsed.args.amount;
+                routedDomain = Number(parsed.args.destinationDomain);
+                break;
+              }
+            } catch (_) {}
+          }
+        }
+      }
+
+      // Off-chain CCTP mode: look at adjacent blocks for the operator's DepositForBurn on the real messenger.
+      // For now we just label "off-chain CCTP path" when we don't find a Routed.
+      const isOffchain = routedAmount === null;
+      const venueLabel = isOffchain ? "via off-chain CCTP (operator EOA)" : `→ ${DOMAINS[routedDomain] || `domain ${routedDomain}`}`;
+
+      const gasUsdcWei = rcpt ? rcpt.gasUsed * rcpt.gasPrice : 0n;  // 18-dec native (USDC-as-gas)
+      const usdcCost = Number(formatUnits(gasUsdcWei, 18));
+      const settlementSec = blk ? Math.max(1, blk.timestamp - reportedAt) : 1;
+      const ageSec = Math.max(0, (Date.now() / 1000) - blk.timestamp);
+
+      // Fill latest-rebalance card
+      if (routedAmount !== null) {
+        setText($("last-amount"), "$" + fmtUsd(routedAmount, 6, 4));
+        $("last-amount").className = "value";
+      } else {
+        setText($("last-amount"), "off-chain burn");
+        $("last-amount").className = "value";
+      }
+      setText($("last-venue"), venueLabel);
+      setText($("last-latency"), `${settlementSec.toFixed(1)}s`);
+      $("last-latency").className = "value fresh";
+      setText($("last-cost"), "$" + usdcCost.toFixed(6));
+      setText($("last-cost-cents"), `${(usdcCost * 100).toFixed(3)}¢ paid in USDC (Arc's native gas token)`);
+      setLinkOrText($("last-tx-link"), cfg.explorer ? `${cfg.explorer}/tx/${txHash}` : "", shortTx(txHash));
+      setLinkOrText($("last-cid-link"), `${ALLOCATIONS_BASE}/${cidHex}.json`, `cid ${cidHex.slice(0,10)}…${cidHex.slice(-6)}.json`);
+
+      // Comparison card
+      setText($("arc-compare-latency"), `${settlementSec.toFixed(1)}s`);
+      setText($("arc-compare-cost"), `$${usdcCost.toFixed(6)} gas (USDC) — from this rebalance`);
+      $("arc-live-tag").style.visibility = "visible";
+
+      // Hero
+      setHero({
+        whaleCount, ageSec, latencySec: settlementSec, costUsdc: usdcCost,
+        txHash, explorer: cfg.explorer,
+      });
+
+      // Reasoning doc preview (async, may fail gracefully)
+      renderReasoning(cidHex);
+    }
+
+    // ---- Index State card ----
+    async function refreshState(provider, cfg) {
+      const nav = new Contract(cfg.addresses.NAVOracle, ABI_NAV, provider);
+      const idx = new Contract(cfg.addresses.IndexToken, ABI_INDEX, provider);
+      try {
+        const [navUsdc, isFresh, updatedAt, maxDeltaBps, supply, sp] = await Promise.all([
+          nav.nav(), nav.isFresh(), nav.updatedAt(), nav.maxDeltaBps().catch(() => 0n),
+          idx.totalSupply(), idx.sharePrice(),
+        ]);
+        setText($("nav"), "$" + fmtUsd(navUsdc, 6, 4));
+        const fresh = $("nav-fresh");
+        fresh.textContent = isFresh
+          ? "fresh — updated " + new Date(Number(updatedAt) * 1000).toLocaleString()
+          : (updatedAt > 0n ? "stale — last update " + new Date(Number(updatedAt) * 1000).toLocaleString() : "never updated");
+        fresh.className = "small " + (isFresh ? "fresh" : "stale");
+        setText($("sp"), "$" + fmtUsd(sp, 6, 4));
+        if (supply === 0n) {
+          $("supply").textContent = "no shares minted yet (treasury seeded directly for testnet)";
+          $("supply").className = "small empty";
+        } else {
+          $("supply").textContent = "supply: " + fmtUsd(supply, 18, 4) + " WHALE";
+          $("supply").className = "small";
+        }
+        setText($("maxdelta"), maxDeltaBps ? `±${Number(maxDeltaBps) / 100}%` : "—");
+      } catch (e) {
+        setText($("nav"), "—"); setText($("sp"), "—"); setText($("maxdelta"), "—");
+        $("nav-fresh").textContent = `read failed: ${e.shortMessage || e.message}`;
+        $("nav-fresh").className = "small stale";
+      }
+    }
+
+    // ---- WhaleAttestation card ----
+    async function refreshAttestation(provider, cfg, latestBlock) {
+      if (!cfg.addresses.WhaleAttestation) {
+        setText($("att-total"), "—"); setText($("att-count"), "—"); setText($("att-slashes"), "—");
+        setText($("last-slash-line"), "WhaleAttestation not deployed for this network");
+        return;
+      }
+      const att = new Contract(cfg.addresses.WhaleAttestation, ABI_ATTEST, provider);
+      try {
+        const bondedLogs = await findAllEventsInWindow(att, "Bonded", latestBlock);
+        const slashLogs  = await findAllEventsInWindow(att, "Slashed", latestBlock);
+
+        // Unique bonded wallets, current bond per wallet.
+        const wallets = new Set();
+        for (const l of bondedLogs) wallets.add(getAddress(l.args.wallet));
+        let totalBondedBase = 0n;
+        let nonzeroCount = 0;
+        for (const w of wallets) {
+          try {
+            const bond = await att.bondAmount(w);
+            if (bond > 0n) { totalBondedBase += bond; nonzeroCount += 1; }
+          } catch (_) {}
+        }
+        setText($("att-total"), "$" + fmtUsd(totalBondedBase, 6, 4));
+        if (nonzeroCount === 0) {
+          setText($("att-count"), "0");
+          $("att-count").className = "value empty";
+        } else {
+          setText($("att-count"), String(nonzeroCount));
+          $("att-count").className = "value";
+        }
+
+        // Slashes
+        setText($("att-slashes"), String(slashLogs.length));
+        if (slashLogs.length) {
+          let totalSlashed = 0n;
+          for (const l of slashLogs) totalSlashed += l.args.amount;
+          $("att-slashed-usdc").textContent = `$${fmtUsd(totalSlashed, 6, 4)} routed to slash beneficiary`;
+          const latest = slashLogs[slashLogs.length - 1];
+          const evCid = latest.args.evidenceCid;
+          const cleanEv = evCid.startsWith("0x") ? evCid.slice(2) : evCid;
+          const slashEl = $("last-slash-line"); clear(slashEl);
+          slashEl.append(
+            document.createTextNode(`${shortAddr(latest.args.wallet)} slashed ${(Number(latest.args.slashBps)/100).toFixed(1)}% · `),
+          );
+          slashEl.appendChild(makeLink(`${cfg.explorer}/tx/${latest.transactionHash}`, "tx"));
+          slashEl.appendChild(document.createTextNode(" · "));
+          slashEl.appendChild(makeLink(`${SLASHES_BASE}/${cleanEv}.json`, "evidence doc"));
+        } else {
+          setText($("last-slash-line"), "none — every bonded whale has stayed within decay threshold");
+        }
+      } catch (e) {
+        setText($("att-total"), "—"); setText($("att-count"), "—"); setText($("att-slashes"), "—");
+        $("last-slash-line").textContent = `read failed: ${e.shortMessage || e.message}`;
+      }
+    }
+
+    // ---- RPC provider w/ fallback ----
     async function tryProvider(rpc) {
-      const p = new JsonRpcProvider(rpc);
-      try { await p.getBlockNumber(); return p; }
+      try { const p = new JsonRpcProvider(rpc); await p.getBlockNumber(); return p; }
       catch { return null; }
     }
 
+    // ---- Master refresh ----
+    let refreshing = false;
+    let lastRefreshAt = 0;
     async function refresh() {
+      if (refreshing) return;
+      refreshing = true;
+      $("refresh-state").textContent = "refreshing…";
+      $("refresh-state").className = "refresh-state refreshing";
       const net = $("network").value;
       const cfg = NETWORKS[net];
-      $("net-badge").textContent = net === "arc-testnet" ? "Arc Testnet" : "Local Anvil";
+      $("net-badge").textContent = net === "arc-testnet" ? "Arc Testnet · live" : "Local Anvil · dev";
+      $("net-badge").className = "net-badge" + (net === "arc-testnet" ? "" : " dim");
       $("err").textContent = "";
-      $("conn").textContent = "connecting…";
 
       populateAddressList(cfg);
 
       let provider = await tryProvider(cfg.rpc);
       if (!provider && cfg.rpcFallback) provider = await tryProvider(cfg.rpcFallback);
       if (!provider) {
-        $("err").textContent = "Both primary and fallback RPC unreachable.";
-        $("conn").textContent = `RPC unreachable: ${cfg.rpc}`;
+        $("err").textContent = "RPC unreachable. Try refresh, or pass --dev=1 to switch to local anvil.";
+        $("conn").textContent = `RPC failed: ${cfg.rpc}`;
+        refreshing = false;
+        $("refresh-state").className = "refresh-state";
         return;
       }
-      const network_ = await provider.getNetwork();
-      $("conn").textContent = `RPC ${provider._getConnection().url} — chain ${network_.chainId}`;
+      const net_ = await provider.getNetwork();
+      $("conn").textContent = `RPC ${provider._getConnection().url} — chain ${net_.chainId}`;
 
       try {
-        const nav = new Contract(cfg.addresses.NAVOracle, ABI_NAV, provider);
-        const idx = new Contract(cfg.addresses.IndexToken, ABI_INDEX, provider);
-        const [navUsdc, isFresh, updatedAt, maxDeltaBps, supply, sp] = await Promise.all([
-          nav.nav(), nav.isFresh(), nav.updatedAt(), nav.maxDeltaBps().catch(() => 0n),
-          idx.totalSupply(), idx.sharePrice(),
+        const latestBlock = await provider.getBlockNumber();
+        await Promise.all([
+          refreshState(provider, cfg),
+          refreshRebalance(provider, cfg, latestBlock),
+          refreshAttestation(provider, cfg, latestBlock),
         ]);
-
-        $("nav").textContent = "$" + fmt(navUsdc, 6, 4);
-        const freshEl = $("nav-fresh");
-        freshEl.textContent = isFresh
-          ? "fresh — updated " + new Date(Number(updatedAt) * 1000).toLocaleString()
-          : "STALE — last update " + (updatedAt > 0n ? new Date(Number(updatedAt) * 1000).toLocaleString() : "never");
-        freshEl.className = "small " + (isFresh ? "fresh" : "stale");
-        $("sp").textContent = "$" + fmt(sp, 6, 4);
-        $("supply").textContent = "supply: " + fmt(supply, 18, 4) + " WHALE";
-        $("maxdelta").textContent = maxDeltaBps ? `±${Number(maxDeltaBps) / 100}%` : "—";
-
-        const latest = await provider.getBlockNumber();
-        // Public RPC limits eth_getLogs to 10K block range. Walk back in 9K chunks
-        // up to ~24h (chunks of 9000 blocks × 10 = 90K ≈ 25h at Arc's 1s blocks).
-        const CHUNK = 9_000;
-        const MAX_CHUNKS = 10;
-
-        const router = new Contract(cfg.addresses.CCTPRouter, ABI_ROUTER, provider);
-        const exec = cfg.addresses.RebalanceExecutor
-          ? new Contract(cfg.addresses.RebalanceExecutor, ABI_EXEC, provider)
-          : null;
-
-        let lastRouted = null, lastAlloc = null;
-        for (let i = 0; i < MAX_CHUNKS && (!lastRouted || !lastAlloc); i++) {
-          const to = latest - i * CHUNK;
-          const from = Math.max(0, to - CHUNK + 1);
-          const [r, a] = await Promise.all([
-            !lastRouted ? router.queryFilter("Routed", from, to).catch(() => []) : Promise.resolve([]),
-            !lastAlloc && exec ? exec.queryFilter("AllocationDecided", from, to).catch(() => []) : Promise.resolve([]),
-          ]);
-          if (!lastRouted && r.length) lastRouted = r[r.length - 1];
-          if (!lastAlloc && a.length) lastAlloc = a[a.length - 1];
-          if (from === 0) break;
-        }
-
-        if (lastRouted) {
-          const venue = DOMAINS[Number(lastRouted.args.destinationDomain)] || `domain ${lastRouted.args.destinationDomain}`;
-          $("last-amount").textContent = "$" + fmt(lastRouted.args.amount, 6, 4);
-          $("last-venue").textContent = "→ " + venue;
-          const txHash = lastRouted.transactionHash;
-          setLinkOrText($("last-tx-link"), cfg.explorer ? `${cfg.explorer}/tx/${txHash}` : "", shortHash(txHash));
-
-          const rcpt = await provider.getTransactionReceipt(txHash);
-          if (rcpt) {
-            const gasNative = rcpt.gasUsed * rcpt.gasPrice; // 18-dec native USDC
-            const usdcCost = Number(formatUnits(gasNative, 18));
-            $("last-cost").textContent = "$" + usdcCost.toFixed(6);
-            $("last-cost-cents").textContent = (usdcCost * 100).toFixed(3) + "¢";
-            $("arc-compare-cost").textContent = "≈ $" + usdcCost.toFixed(4) + " gas (USDC)";
-          }
-        } else {
-          $("last-amount").textContent = "no recent rebalances";
-          $("last-venue").textContent = "(searched last ~24h)";
-        }
-
-        if (lastAlloc) {
-          const cidHex = lastAlloc.args.cid;
-          const cidStr = cidHex.startsWith("0x") ? cidHex.slice(2) : cidHex;
-          setLinkOrText($("last-cid-link"), `${ALLOCATIONS_BASE}/${cidStr}.json`, `cid ${cidHex.slice(0, 14)}…`);
-        } else {
-          $("last-cid-link").textContent = "no AllocationDecided event in window";
-        }
-
-        if (lastRouted) {
-          const recentBlocks = await Promise.all([
-            provider.getBlock(latest),
-            provider.getBlock(Math.max(0, latest - 5)),
-          ]);
-          if (recentBlocks[0] && recentBlocks[1]) {
-            const dt = recentBlocks[0].timestamp - recentBlocks[1].timestamp;
-            const perBlockSec = dt / 5;
-            $("last-latency").textContent = `${perBlockSec.toFixed(2)}s`;
-            $("last-latency").className = "value fresh";
-            $("arc-compare-latency").textContent = `~${perBlockSec.toFixed(1)}s`;
-          }
-        }
       } catch (e) {
         $("err").textContent = "read failed: " + (e.shortMessage || e.message);
       }
+      lastRefreshAt = Date.now();
+      refreshing = false;
+      $("refresh-state").className = "refresh-state";
+      tickRefreshState();
+    }
+
+    function tickRefreshState() {
+      if (refreshing) return;
+      const sec = Math.max(0, Math.round((Date.now() - lastRefreshAt) / 1000));
+      $("refresh-state").textContent = lastRefreshAt
+        ? `updated ${sec}s ago · next in ${Math.max(0, 15 - sec)}s`
+        : "refreshes every 15s";
+      $("footer-meta").textContent = lastRefreshAt
+        ? `last refresh ${new Date(lastRefreshAt).toLocaleTimeString()} · auto every 15s`
+        : "page loading · auto-refresh every 15s";
     }
 
     $("refresh").addEventListener("click", refresh);
     $("network").addEventListener("change", refresh);
     refresh();
     setInterval(refresh, 15000);
+    setInterval(tickRefreshState, 1000);
   </script>
 </body>
 </html>
