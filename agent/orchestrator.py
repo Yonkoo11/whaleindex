@@ -216,6 +216,22 @@ def _publish_allocation_doc(doc: dict[str, Any], cid: bytes) -> Path:
     return out_path
 
 
+def _publish_latest_pointer(doc: dict[str, Any], cid: bytes, *, traded: bool) -> Path:
+    """Write docs/decision-latest.json so the frontend can always show the most recent
+    decision directly — including a decision NOT to trade, which has no on-chain rebalance
+    event to discover it by. Provenance for every decision, not just the ones that move funds."""
+    out_path = DOCS_ALLOCATIONS_DIR.parent / "decision-latest.json"
+    pointer = {
+        "cid": cid.hex(),
+        "traded": traded,
+        "snapshot_iso": doc.get("snapshot_iso"),
+        "doc_url": f"allocations/{cid.hex()}.json",
+        "doc": doc,
+    }
+    out_path.write_text(json.dumps(pointer, sort_keys=True, indent=2))
+    return out_path
+
+
 def _append_history(row: dict[str, Any]) -> None:
     HISTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
     with HISTORY_PATH.open("a") as f:
@@ -372,8 +388,27 @@ async def run(
     allocations: list[Allocation] = decision.chosen.allocations if decision.chosen else []
 
     if not allocations and not allow_demo_fallback:
-        print("[orchestrator] no allocations produced — nothing to rebalance. exit 0.")
-        print("              (set --demo-allocation to inject a synthetic 1-coin allocation for end-to-end testing)")
+        # A decision NOT to trade is still a decision worth anchoring. Publish the full
+        # audit trail (scores + proposals + risk verdicts) so the frontend can show why
+        # the agent stood down this cycle. No on-chain rebalance — there is nothing to move.
+        print("[orchestrator] no allocations survived risk review — recording a NO-REBALANCE decision.")
+        no_trade_doc = _build_allocation_doc(
+            survivors_wallets=keep,
+            positions=positions,
+            pnl_window=pnl,
+            allocations=[],
+            aum_usdc=aum_usdc,
+            pnl_window_days=pnl_window_days,
+            multi_agent_audit=decision.audit,
+            chosen_proposal_name=None,
+            coordinator_reasoning=decision.reasoning,
+        )
+        no_trade_cid = _cid_of(no_trade_doc)
+        doc_path = _publish_allocation_doc(no_trade_doc, no_trade_cid)
+        ptr_path = _publish_latest_pointer(no_trade_doc, no_trade_cid, traded=False)
+        print(f"      cid: 0x{no_trade_cid.hex()}")
+        print(f"      written: {doc_path.relative_to(REPO_ROOT)}")
+        print(f"      latest pointer: {ptr_path.relative_to(REPO_ROOT)}")
         return 0
 
     if not allocations and allow_demo_fallback:
@@ -422,6 +457,7 @@ async def run(
     )
     cid = _cid_of(doc)
     out_path = _publish_allocation_doc(doc, cid)
+    _publish_latest_pointer(doc, cid, traded=True)
     print(f"      cid: 0x{cid.hex()}")
     print(f"      written: {out_path.relative_to(REPO_ROOT)}")
     print(f"      will be public at: https://yonkoo11.github.io/whaleindex/allocations/{cid.hex()}.json")

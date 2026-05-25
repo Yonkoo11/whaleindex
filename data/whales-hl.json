@@ -1,20 +1,23 @@
 {
   "version": 2,
-  "snapshot_at": "2026-05-24T11:36:13Z",
+  "snapshot_at": "2026-05-25T21:48:53Z",
   "whales": [
     {
-      "wallet": "0x2068F22b91dF98AB3a04D67BC2A2B4C8c5cF3D1E",
-      "label": "HL whale 3",
-      "added_at": "2026-05-17",
-      "added_by": "",
+      "wallet": "0x393d0b87ed38fc779fd9611144ae649ba6082109",
+      "label": "HL leaderboard #1",
+      "added_at": "2026-05-25",
+      "added_by": "operator",
       "sources": [
         {
-          "url": "hyperdash.info/leaderboard (manual capture 2026-05-17)",
-          "captured_at": "2026-05-17"
+          "url": "app.hyperliquid.xyz/leaderboard (manual capture 2026-05-25)",
+          "captured_at": "2026-05-25"
         }
       ],
-      "tags": [],
-      "notes": "Placeholder address \u2014 replace with curated picks from hyperdash leaderboard before deploy",
+      "tags": [
+        "hyperliquid",
+        "leaderboard-30d"
+      ],
+      "notes": "Curated from Hyperliquid 30d leaderboard 2026-05-25.",
       "metrics": {
         "pnl_30d_usd": 0.0,
         "position_count_current": 0,
@@ -22,18 +25,21 @@
       }
     },
     {
-      "wallet": "0x9A89e02b0b6F1aaF6c5dC8B69D6e7Ad1eF1Cf671",
-      "label": "HL whale 1",
-      "added_at": "2026-05-17",
-      "added_by": "",
+      "wallet": "0x488d2a9b70cc18ef66057a48ab3d59da1c59fe08",
+      "label": "HL leaderboard #2",
+      "added_at": "2026-05-25",
+      "added_by": "operator",
       "sources": [
         {
-          "url": "hyperdash.info/leaderboard (manual capture 2026-05-17)",
-          "captured_at": "2026-05-17"
+          "url": "app.hyperliquid.xyz/leaderboard (manual capture 2026-05-25)",
+          "captured_at": "2026-05-25"
         }
       ],
-      "tags": [],
-      "notes": "Placeholder address \u2014 replace with curated picks from hyperdash leaderboard before deploy",
+      "tags": [
+        "hyperliquid",
+        "leaderboard-30d"
+      ],
+      "notes": "Curated from Hyperliquid 30d leaderboard 2026-05-25.",
       "metrics": {
         "pnl_30d_usd": 0.0,
         "position_count_current": 0,
@@ -41,18 +47,197 @@
       }
     },
     {
-      "wallet": "0xCcF3d1aCF799bAe67F6e354d685295557cF64761",
-      "label": "HL whale 2",
-      "added_at": "2026-05-17",
-      "added_by": "",
+      "wallet": "0x4eb8d907136189a34c9b087950211b6a566f7819",
+      "label": "HL leaderboard #3",
+      "added_at": "2026-05-25",
+      "added_by": "operator",
       "sources": [
         {
-          "url": "hyperdash.info/leaderboard (manual capture 2026-05-17)",
-          "captured_at": "2026-05-17"
+          "url": "app.hyperliquid.xyz/leaderboard (manual capture 2026-05-25)",
+          "captured_at": "2026-05-25"
         }
       ],
-      "tags": [],
-      "notes": "Placeholder address \u2014 replace with curated picks from hyperdash leaderboard before deploy",
+      "tags": [
+        "hyperliquid",
+        "leaderboard-30d"
+      ],
+      "notes": "Curated from Hyperliquid 30d leaderboard 2026-05-25.",
+      "metrics": {
+        "pnl_30d_usd": 0.0,
+        "position_count_current": 0,
+        "last_metrics_refresh": ""
+      }
+    },
+    {
+      "wallet": "0x05cafe987297448f21a3c7ae0ae815fddecac655",
+      "label": "HL leaderboard #4",
+      "added_at": "2026-05-25",
+      "added_by": "operator",
+      "sources": [
+        {
+          "url": "app.hyperliquid.xyz/leaderboard (manual capture 2026-05-25)",
+          "captured_at": "2026-05-25"
+        }
+      ],
+      "tags": [
+        "hyperliquid",
+        "leaderboard-30d"
+      ],
+      "notes": "Curated from Hyperliquid 30d leaderboard 2026-05-25.",
+      "metrics": {
+        "pnl_30d_usd": 0.0,
+        "position_count_current": 0,
+        "last_metrics_refresh": ""
+      }
+    },
+    {
+      "wallet": "0xe44bd27c9f10fa2f89fdb3ab4b4f0e460da29ea8",
+      "label": "HL leaderboard #5",
+      "added_at": "2026-05-25",
+      "added_by": "operator",
+      "sources": [
+        {
+          "url": "app.hyperliquid.xyz/leaderboard (manual capture 2026-05-25)",
+          "captured_at": "2026-05-25"
+        }
+      ],
+      "tags": [
+        "hyperliquid",
+        "leaderboard-30d"
+      ],
+      "notes": "Curated from Hyperliquid 30d leaderboard 2026-05-25.",
+      "metrics": {
+        "pnl_30d_usd": 0.0,
+        "position_count_current": 0,
+        "last_metrics_refresh": ""
+      }
+    },
+    {
+      "wallet": "0x90b38c5728f184c87ef46479cf7b402d7b98b98a",
+      "label": "HL leaderboard #6",
+      "added_at": "2026-05-25",
+      "added_by": "operator",
+      "sources": [
+        {
+          "url": "app.hyperliquid.xyz/leaderboard (manual capture 2026-05-25)",
+          "captured_at": "2026-05-25"
+        }
+      ],
+      "tags": [
+        "hyperliquid",
+        "leaderboard-30d"
+      ],
+      "notes": "Curated from Hyperliquid 30d leaderboard 2026-05-25.",
+      "metrics": {
+        "pnl_30d_usd": 0.0,
+        "position_count_current": 0,
+        "last_metrics_refresh": ""
+      }
+    },
+    {
+      "wallet": "0x85530f0ff6496c72a619f37a60f3c1a59077737f",
+      "label": "HL leaderboard #7",
+      "added_at": "2026-05-25",
+      "added_by": "operator",
+      "sources": [
+        {
+          "url": "app.hyperliquid.xyz/leaderboard (manual capture 2026-05-25)",
+          "captured_at": "2026-05-25"
+        }
+      ],
+      "tags": [
+        "hyperliquid",
+        "leaderboard-30d"
+      ],
+      "notes": "Curated from Hyperliquid 30d leaderboard 2026-05-25.",
+      "metrics": {
+        "pnl_30d_usd": 0.0,
+        "position_count_current": 0,
+        "last_metrics_refresh": ""
+      }
+    },
+    {
+      "wallet": "0x4e14fc11f58b64740e66e4b1aa188a4b007c0eab",
+      "label": "HL leaderboard #8",
+      "added_at": "2026-05-25",
+      "added_by": "operator",
+      "sources": [
+        {
+          "url": "app.hyperliquid.xyz/leaderboard (manual capture 2026-05-25)",
+          "captured_at": "2026-05-25"
+        }
+      ],
+      "tags": [
+        "hyperliquid",
+        "leaderboard-30d"
+      ],
+      "notes": "Curated from Hyperliquid 30d leaderboard 2026-05-25.",
+      "metrics": {
+        "pnl_30d_usd": 0.0,
+        "position_count_current": 0,
+        "last_metrics_refresh": ""
+      }
+    },
+    {
+      "wallet": "0x082e843a431aef031264dc232693dd710aedca88",
+      "label": "HL leaderboard #9",
+      "added_at": "2026-05-25",
+      "added_by": "operator",
+      "sources": [
+        {
+          "url": "app.hyperliquid.xyz/leaderboard (manual capture 2026-05-25)",
+          "captured_at": "2026-05-25"
+        }
+      ],
+      "tags": [
+        "hyperliquid",
+        "leaderboard-30d"
+      ],
+      "notes": "Curated from Hyperliquid 30d leaderboard 2026-05-25.",
+      "metrics": {
+        "pnl_30d_usd": 0.0,
+        "position_count_current": 0,
+        "last_metrics_refresh": ""
+      }
+    },
+    {
+      "wallet": "0x493db0ed7514c975e9abcc110bd40c473b6763e3",
+      "label": "HL leaderboard #10",
+      "added_at": "2026-05-25",
+      "added_by": "operator",
+      "sources": [
+        {
+          "url": "app.hyperliquid.xyz/leaderboard (manual capture 2026-05-25)",
+          "captured_at": "2026-05-25"
+        }
+      ],
+      "tags": [
+        "hyperliquid",
+        "leaderboard-30d"
+      ],
+      "notes": "Curated from Hyperliquid 30d leaderboard 2026-05-25.",
+      "metrics": {
+        "pnl_30d_usd": 0.0,
+        "position_count_current": 0,
+        "last_metrics_refresh": ""
+      }
+    },
+    {
+      "wallet": "0x62bc1fe6009388219dd84f9dca37930f6fb6fa22",
+      "label": "HL leaderboard #11",
+      "added_at": "2026-05-25",
+      "added_by": "operator",
+      "sources": [
+        {
+          "url": "app.hyperliquid.xyz/leaderboard (manual capture 2026-05-25)",
+          "captured_at": "2026-05-25"
+        }
+      ],
+      "tags": [
+        "hyperliquid",
+        "leaderboard-30d"
+      ],
+      "notes": "Curated from Hyperliquid 30d leaderboard 2026-05-25.",
       "metrics": {
         "pnl_30d_usd": 0.0,
         "position_count_current": 0,
