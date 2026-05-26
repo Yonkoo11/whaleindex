@@ -1,0 +1,38 @@
+[
+  {
+    "id": 1,
+    "section": "hook",
+    "tts": "Copy-trading bots tell you what to buy. None of them tell you why. You're trusting a black box with your money. Whale Index is the opposite of a black box.",
+    "caption": "Copy-trading bots tell you what to buy. None tell you why. WhaleIndex is the opposite of a black box."
+  },
+  {
+    "id": 2,
+    "section": "what",
+    "tts": "Whale Index is an index token on Arc testnet, priced in U S D C, that mirrors the top Hyper-liquid whale positions. A pipeline of four agents decides every cycle. A Scorer ranks the whales, an Allocator drafts weightings, a Risk agent can veto, and a Coordinator makes the final call.",
+    "caption": "An index token on Arc, priced in USDC, mirroring top Hyperliquid whales. Four agents decide every cycle: Scorer, Allocator, Risk, Coordinator."
+  },
+  {
+    "id": 3,
+    "section": "differentiator",
+    "tts": "Here's what makes it different. This cycle, the agents looked at the whales and chose not to trade. Both active whales were long, so the Risk agent vetoed all three proposals, and the Coordinator held. Most bots would hide that. Whale Index publishes it. The decision to do nothing is a first-class record, with the full reasoning attached.",
+    "caption": "This cycle the agents chose NOT to trade. Risk vetoed all three proposals; the Coordinator held. The decision to do nothing is published, with full reasoning."
+  },
+  {
+    "id": 4,
+    "section": "verify",
+    "tts": "And you don't have to take my word for it. Every cycle is hashed into a document and anchored on-chain. Open the full record and you can read exactly what each agent saw and decided. Don't trust the agent. Verify it.",
+    "caption": "Every cycle is hashed and anchored on-chain. Open the full record and read what each agent saw. Don't trust the agent. Verify it."
+  },
+  {
+    "id": 5,
+    "section": "buy",
+    "tts": "It's a real product, not a slideshow. Connect a wallet and you can buy or redeem index shares at the on-chain nav, settled on Arc in about a second, with U S D C as the gas token, so you never touch a separate fee coin.",
+    "caption": "Connect a wallet and buy or redeem shares at the on-chain NAV, settled on Arc in ~1s. USDC is the gas token, so no separate fee coin."
+  },
+  {
+    "id": 6,
+    "section": "close",
+    "tts": "Under the hood: Arc for settlement, U S D C for everything, C C T P for cross-chain routing, and U S Y C for idle yield, both mocked on testnet until Circle allowlists us, plus a staking bond that slashes a whale if it misbehaves. Whale Index is a proof-of-reasoning ledger with a buy button. That's the whole idea.",
+    "caption": "Arc settlement, USDC everywhere, CCTP routing and USYC yield (both mocked on testnet), plus a slashing bond. A proof-of-reasoning ledger with a buy button."
+  }
+]

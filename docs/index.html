@@ -1210,12 +1210,15 @@ async function refreshState(prov){
   const navc=new Contract(ARC.addresses.NAVOracle, ABI_NAV, prov);
   const idx=new Contract(ARC.addresses.IndexToken, ABI_INDEX, prov);
   try{
-    const [navUsdc,isFresh,updatedAt,maxDelta,supply,sp]=await Promise.all([
+    const [navUsdc,isFresh,updatedAt,maxDelta,supply]=await Promise.all([
       navc.nav(), navc.isFresh(), navc.updatedAt(), navc.maxDeltaBps().catch(()=>0n),
-      idx.totalSupply(), idx.sharePrice(),
+      idx.totalSupply(),
     ]);
-    SHARE_PRICE_RAW=sp;
-    const spNum=Number(formatUnits(sp,6));
+    // Price per WHALE in USDC (6-dec), derived from live NAV + supply. The on-chain
+    // sharePrice() truncates to whole USDC (SHARE_SCALE rounding), so compute it
+    // precisely here: navUsdc(6dec) * 1 WHALE / supply.
+    SHARE_PRICE_RAW = supply===0n ? 1000000n : (navUsdc * (10n**18n)) / supply;
+    const spNum=Number(formatUnits(SHARE_PRICE_RAW,6));
     setHTML($("#navKpi"), priceMarkup(spNum.toFixed(4)));
     setHTML($("#navPrice"), priceMarkup(spNum.toFixed(4)));
     setText($("#navAum"),"total NAV $"+fmtUsd(navUsdc,6,2));

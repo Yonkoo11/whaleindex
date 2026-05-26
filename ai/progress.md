@@ -1,4 +1,31 @@
 
+## 2026-05-26 (later) — Demo video built + share-price display bug fixed
+
+### What Changed (Plain English)
+- The 1 minute 43 second demo video is made. It's a narrated walkthrough of the live
+  site: the thesis, the four-agent pipeline, the Risk agent's real veto, the full record,
+  the buy panel with a real $1.00 price and a correct 25-share estimate, and the Circle stack.
+  Voiceover only, no background music. Captions are burned in. It's on the live site at
+  /whaleindex-demo.mp4 and copied for the submission.
+- Fixed the "$0.0000" price bug. The page was reading an on-chain price that rounds to whole
+  dollars; now it computes the exact price from the live NAV and share supply, so the top-bar
+  pill, the NAV card, the position value, and the buy estimate all read $1.0000 correctly.
+
+### How the video was built (reproducible in video-build/)
+- gen-voice.mjs: ElevenLabs voiceover (voice Adam) from segments.json -> per-segment mp3 +
+  word-timed captions.srt + timeline.json. Key read from env, never printed.
+- assemble-audio.sh: stitches the clips into out/vo.mp3 (102.3s).
+- record.mjs: puppeteer-core scripted screencast of the site, paced to the VO timeline,
+  with a read-only injected wallet (forwards to live Arc RPC, shows the real holder's real
+  balances, cannot sign, never submits a tx) and an in-page synced caption bar.
+- build-final.sh: muxes screencast + voiceover -> out/whaleindex-demo.mp4 (1280x800, 7.2MB).
+- node_modules/ and out/ are gitignored; scripts + captions.srt are kept.
+
+### Open items
+- Video is hosted on Pages (.mp4 link). For a nicer player, upload to YouTube Unlisted.
+- Recording was captured against a local copy with the price fix; after this publish the live
+  site has the same fix, so the live demo and the video now match.
+
 ## 2026-05-26 — V4 redeploy: public Buy/Redeem now live + submission + video plan
 
 ### What Changed (Plain English)

@@ -48,7 +48,9 @@ https://github.com/Yonkoo11/whaleindex
 https://yonkoo11.github.io/whaleindex
 
 ## Project Video Demo
-[YOU, record a Loom or YouTube link under 3 minutes]
+A 1:43 narrated walkthrough is built and ships on the live site:
+https://yonkoo11.github.io/whaleindex/whaleindex-demo.mp4
+For a nicer player, upload that same file to YouTube as Unlisted and paste the YouTube link here instead (recommended for judges). Subtitles file for the upload: video-build/captions.srt.
 
 ## (Arc OSS) Apply checkbox
 Yes, check it. The repo is already open source and stays that way.

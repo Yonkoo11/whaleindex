@@ -1,0 +1,16 @@
+{
+  "name": "video-build",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "puppeteer-core": "^24.43.1",
+    "puppeteer-screen-recorder": "^3.0.6"
+  }
+}
