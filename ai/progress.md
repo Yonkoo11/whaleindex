@@ -1,4 +1,28 @@
 
+## 2026-05-26 — V4 redeploy: public Buy/Redeem now live + submission + video plan
+
+### What Changed (Plain English)
+- The live site's Buy and Redeem buttons now actually work. Before, they failed because the
+  price feed went stale after 60 seconds. I redeployed the contracts so the price feed stays
+  valid for 30 days on testnet and seeded a starting price, so a judge clicking Buy any time succeeds.
+- I made one real purchase to prove it: 1 USDC bought 1 index share on Arc. The dashboard shows that holder.
+- Live site repointed to the new contracts and published.
+- Hackathon answers written to SUBMISSION.md (no AI-slop tells). Demo video plan in ai/demo-video-plan.md.
+
+### Live state (verified on-chain 2026-05-26)
+- Stack V4. Addresses in deployments/arc-testnet.json (V3 in legacy block).
+- NAVOracle 0x01235eaC: owner=executor, freshnessWindow=30 days, nav=1.00 USDC, isFresh=true.
+- IndexToken 0x2415F39a: new oracle ref, not paused, totalSupply=1 WHALE.
+- Real buy tx: 0x0f5d88edb8ea15060fbe86f0aa6853c5f8e03eb40e4df90bba6cacb508b670ce.
+- Live site serves V4, renders "oracle fresh" + 1 WHALE, no JS errors.
+
+### Known open items
+- Cosmetic: top-bar NAV pill shows "$0.0000" with only 1 share minted (rounding/timing display bug). Not blocking.
+- Real browser-wallet buy (wallet popup + signature) still not clicked end-to-end; contract buy path IS proven live (tx above).
+- CCTP + USYC still mocked on testnet (Circle allowlist pending), disclosed in UI + submission.
+- Demo video not made yet. Plan ready; awaiting Option A (user records) vs B (I build).
+- Submission still needs from user: email, Discord/Telegram/X handles, team name, traction numbers, video link. No deadline visible on form.
+
 ## 2026-05-25 — Production homepage rebuilt (hybrid of 3 approved proposals)
 
 ### What Changed (Plain English)
