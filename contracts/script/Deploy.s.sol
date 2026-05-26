@@ -27,6 +27,10 @@ contract DeployScript is Script {
     uint32 constant DOMAIN_ARBITRUM = 3;
     uint32 constant DOMAIN_SOLANA   = 5;
 
+    // Demo seeding (testnet only). See the seeding block in run() for rationale.
+    uint64  constant DEMO_FRESHNESS_WINDOW = 30 days;   // keep buy/redeem live across judging
+    uint256 constant INITIAL_NAV_USDC      = 1_000_000; // 1.00 USDC baseline share price
+
     function run() external {
         uint256 deployerKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
         address deployer    = vm.addr(deployerKey);
@@ -88,6 +92,17 @@ contract DeployScript is Script {
         // Single-key setup: deployer == operator, so NAV ownership transfers
         // in the same broadcast. Two-key setup leaves NAV owned by `operator`.
         if (operator == deployer) {
+            // Demo seeding (testnet only): while the deployer still owns the
+            // oracle, widen the freshness window and seed an initial NAV so the
+            // public buy/redeem path is live the moment the stack is deployed,
+            // WITHOUT fabricating a rebalance trade to warm the oracle.
+            //
+            // PRODUCTION NOTE: a real deployment keeps freshnessWindow short
+            // (~60s, the constructor default) and runs an operator NAV heartbeat.
+            // The long window here reflects that this testnet NAV is intentionally
+            // static — the agent is in a published HOLD state, so NAV does not move.
+            nav.setFreshnessWindow(DEMO_FRESHNESS_WINDOW);
+            nav.updateNAV(INITIAL_NAV_USDC, uint64(block.timestamp));
             nav.transferOwnership(address(exec));
         }
 

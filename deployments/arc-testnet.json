@@ -4,8 +4,13 @@
     "chain_id": 5042002,
     "rpc": "https://rpc.testnet.arc-node.thecanteenapp.com/v1/<arc-canteen-token>",
     "explorer": "https://testnet.arcscan.app",
-    "deployed_at": "2026-05-23",
-    "version": "V2",
+    "deployed_at": "2026-05-26",
+    "version": "V4",
+    "v4_changes": [
+      "NAVOracle freshnessWindow set to 30 days at deploy (constructor default stays 60s) and an initial NAV of 1.00 USDC seeded while the deployer still owns the oracle, BEFORE the ownership handoff to RebalanceExecutor. Result: the public buy/redeem path is live the moment the stack deploys, with no need to fabricate a rebalance trade to warm a 60s oracle. PRODUCTION would keep the 60s window + an operator NAV heartbeat; the long window is honest here because this testnet NAV is intentionally static (agent is in a published HOLD state).",
+      "Real operator buy executed against the live stack: tx 0x0f5d88edb8ea15060fbe86f0aa6853c5f8e03eb40e4df90bba6cacb508b670ce (approve tx 0xa2f85797daa5a777e0c2e9a2cb7e0e65faf5132d19bda73895c489812b8eb04d), 1.00 USDC -> 1 WHALE, status 1, totalSupply now 1e18. Buy write path proven on-chain, not just simulated.",
+      "Frontend docs/index.html repointed to the 8 V4 addresses."
+    ],
     "deployer": "0xf9946775891a24462cD4ec885d0D4E2675C84355",
     "operator": "0xf9946775891a24462cD4ec885d0D4E2675C84355",
     "deploy_tx_run": "contracts/broadcast/Deploy.s.sol/5042002/run-latest.json",
@@ -61,6 +66,16 @@
   },
   "addresses": {
     "USDC":              "0x3600000000000000000000000000000000000000",
+    "USYC":              "0xCd10a39171E655E496D3B34C16B606F144ae4707",
+    "TokenMessenger":    "0xD36C14365B93190bE416A2F5feCBD1bE07d202CC",
+    "NAVOracle":         "0x01235eaC0C5d9ef29E9652a12E5cfe4939E99aBB",
+    "CCTPRouter":        "0x22f459f5fdb161FdA885c9d44DcEbfd478225566",
+    "USYCParkVault":     "0x3feAc926eaC96d7411F3006D3ae903F10c451Bb9",
+    "IndexToken":        "0x2415F39a3831aCd403b8353A7850A71a9515Da08",
+    "RebalanceExecutor": "0x64DA6c2A29ce0468b4dc10e5ee1bC61076AD40e6",
+    "WhaleAttestation":  "0x1d2d34D941b13CbF233051074F007ecf68fB0F7f"
+  },
+  "v3_legacy_addresses_for_reference": {
     "USYC":              "0x2B540589EAF231b930Ed5D53ee3CE292904ccb2d",
     "TokenMessenger":    "0x2522423855550e82016103c79F097042Cf2d5a0B",
     "NAVOracle":         "0xfEbB84BE47b0d440Ba08DaE0f5E3b09B4f989Cf8",
@@ -68,7 +83,7 @@
     "USYCParkVault":     "0x59a69BAFb6dCc9BF304bBE0583561aDf3B613435",
     "IndexToken":        "0xAdEa3FaE6011c2D275868d1c1933B37BE7648269",
     "RebalanceExecutor": "0xb06a30226979789508306dAA9b027914045a4024",
-    "WhaleAttestation":  "0x1d2d34D941b13CbF233051074F007ecf68fB0F7f"
+    "_note": "V3 deploy 2026-05-24. Superseded by V4 (2026-05-26). Freshness window was 60s and locked (oracle owned by executor), so the public buy reverted with StaleNAV. V4 fixes that at deploy time."
   },
   "v2_legacy_addresses_for_reference": {
     "USYC":              "0x86df318Ff4356682Da819516bd05B9873f3b8F07",
