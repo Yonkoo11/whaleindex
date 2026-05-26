@@ -36,10 +36,10 @@ WhaleIndex is a USDC-denominated index token on Arc testnet that mirrors the top
 
 Tech: Solidity 0.8.24 with Foundry and OpenZeppelin v5 contracts (NAVOracle, IndexToken with buy and redeem at NAV, RebalanceExecutor, WhaleAttestation slash-bond), a Python multi-agent orchestrator with an optional Anthropic reasoner, and a vanilla JS plus ethers.js frontend hosted on GitHub Pages wired to live Arc RPC. Circle CCTP routing and a USYC park vault for idle capital are wired but mocked on testnet (see the feedback note below).
 
-The live demo right now shows a real no-trade decision: both currently active whales are long, the Risk agent vetoed all three allocation proposals, and the Coordinator held. That decision to hold is published with its full audit trail, which is the whole point of the project.
+The live demo right now shows a real no-trade decision: both currently active whales are long, the Risk agent vetoed all three allocation proposals, and the Coordinator held. That decision to hold is published with its full audit trail, which is the whole point of the project. On the same page you can connect a wallet and buy or redeem WHALE shares at the on-chain NAV; the buy path is live on Arc testnet, not a mockup (first real buy: 1 USDC to 1 WHALE share).
 
 ## Traction
-[YOU, add real numbers] The live read-only dashboard is public and seeded with 11 real Hyperliquid whale addresses pulled from the leaderboard. Add any testers, repo stars, or social activity here.
+[YOU, add real numbers] The live dashboard is public, seeded with 11 real Hyperliquid whale addresses from the leaderboard, and has a working buy and redeem flow on Arc testnet. Add any testers, repo stars, or social activity here.
 
 ## Project Source Code
 https://github.com/Yonkoo11/whaleindex
