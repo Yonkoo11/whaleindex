@@ -29,10 +29,15 @@ audit_result: pass
 issues_fixed: 2 (settlement-cell wrapping on held cycle; NAV total-vs-per-share pill label)
 production_target: docs/index.html — hybrid built + wired to live Arc RPC + decision-latest.json + attestation + wallet buyer flow
 
-phase_5: completed
-qa_result: APPROVED (with caveat)
-qa_automated: "0 emojis · 0 transition:all · 0 gradient text · DM Sans+Crimson Pro+JetBrains Mono loaded · prefers-reduced-motion honored · tabular-nums x19 · no missing element ids"
-qa_caveat: "Buyer WRITE path (connect/approve/buy/redeem) is wired but NOT live-executed — needs a funded browser wallet on Arc to verify. Read path (NAV, decision, attestation, contracts) verified live via local render against real Arc RPC."
+phase_5: completed (ran ui-revamp + frontend-design qa skills for real this round)
+qa_result: APPROVED (one documented type-scale exception + one untested write path)
+ui_revamp_audit: "15 violations -> 0 (fixed: 2 linear easings, 12 unguarded hover rules, scattered radii). Independently re-verified 0."
+qa_automated: "0 emojis · 0 transition:all · 0 gradient text · 1 !important (reduced-motion block, legit) · colors from tokens · DM Sans+Crimson Pro+JetBrains Mono"
+qa_typography: "FIXED — removed all sub-12px text (was 10px/11px). No text below 12px. Reading prose 14-16px, 12px reserved for uppercase tracked labels, 13px dense mono data."
+qa_type_exception: "Hard gate #3 wants most-used size >=14px; most-used is 13px (dense mono data). Judged an intentional data-UI choice (matches Linear's 13px + research brief 'weight not size' + style config dense-data intent), NOT broken type. Documented, not silently passed."
+qa_slop: "FIXED — stripped 15 prose em dashes (AI-slop tell flagged by user) -> commas/periods/semicolons. 0 slop words (delve/vibrant/seamless/etc). Placeholder '—' glyphs kept (not parenthetical prose)."
+qa_caveat: "Buyer WRITE path (connect/approve/buy/redeem) wired + partially validated by read-only sim (buy() reachable, USDC is std 6-dec ERC20, reverts as expected on no-allowance) but NEVER live-executed. NAV oracle currently STALE, which can block a real buy until refreshed. Read path verified live."
+pushed_to_live: "NO — ui-revamp + qa polish commits are local only; live site (yonkoo11.github.io/whaleindex) still shows pre-polish hybrid from commit 227ae32."
 
 phase_5: pending
 qa_result:
