@@ -1,83 +1,83 @@
 1
-00:00:00,000 --> 00:00:03,641
+00:00:00,000 --> 00:00:03,860
 Copy-trading bots tell you what to buy.
 
 2
-00:00:03,641 --> 00:00:05,321
+00:00:03,860 --> 00:00:05,642
 None tell you why.
 
 3
-00:00:05,321 --> 00:00:09,242
+00:00:05,642 --> 00:00:09,799
 WhaleIndex is the opposite of a black box.
 
 4
-00:00:09,642 --> 00:00:20,055
+00:00:10,199 --> 00:00:19,991
 An index token on Arc, priced in USDC, mirroring top Hyperliquid whales.
 
 5
-00:00:20,055 --> 00:00:24,539
+00:00:19,991 --> 00:00:24,207
 Four agents decide every cycle:
 
 6
-00:00:24,539 --> 00:00:29,890
+00:00:24,207 --> 00:00:29,239
 Scorer, Allocator, Risk, Coordinator.
 
 7
-00:00:30,290 --> 00:00:35,990
+00:00:29,639 --> 00:00:34,884
 This cycle the agents chose NOT to trade.
 
 8
-00:00:35,990 --> 00:00:40,438
+00:00:34,884 --> 00:00:38,978
 Risk vetoed all three proposals;
 
 9
-00:00:40,438 --> 00:00:43,358
+00:00:38,978 --> 00:00:41,665
 the Coordinator held.
 
 10
-00:00:43,358 --> 00:00:51,838
+00:00:41,665 --> 00:00:49,469
 The decision to do nothing is published, with full reasoning.
 
 11
-00:00:52,238 --> 00:00:57,201
+00:00:49,869 --> 00:00:54,556
 Every cycle is hashed and anchored on-chain.
 
 12
-00:00:57,201 --> 00:01:02,840
+00:00:54,556 --> 00:00:59,881
 Open the full record and read what each agent saw.
 
 13
-00:01:02,840 --> 00:01:05,321
+00:00:59,881 --> 00:01:02,225
 Don't trust the agent.
 
 14
-00:01:05,321 --> 00:01:06,449
+00:01:02,225 --> 00:01:03,290
 Verify it.
 
 15
-00:01:06,849 --> 00:01:13,794
+00:01:03,690 --> 00:01:10,064
 Connect a wallet and buy or redeem shares at the on-chain NAV,
 
 16
-00:01:13,794 --> 00:01:16,259
+00:01:10,064 --> 00:01:12,326
 settled on Arc in ~1s.
 
 17
-00:01:16,259 --> 00:01:21,524
+00:01:12,326 --> 00:01:17,158
 USDC is the gas token, so no separate fee coin.
 
 18
-00:01:21,924 --> 00:01:26,216
+00:01:17,558 --> 00:01:21,889
 Arc settlement, USDC everywhere,
 
 19
-00:01:26,216 --> 00:01:33,325
+00:01:21,889 --> 00:01:29,063
 CCTP routing and USYC yield (both mocked on testnet),
 
 20
-00:01:33,325 --> 00:01:36,141
+00:01:29,063 --> 00:01:31,905
 plus a slashing bond.
 
 21
-00:01:36,141 --> 00:01:42,311
+00:01:31,905 --> 00:01:38,131
 A proof-of-reasoning ledger with a buy button.

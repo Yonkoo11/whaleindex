@@ -32,7 +32,7 @@
   {
     "id": 6,
     "section": "close",
-    "tts": "Under the hood: Arc for settlement, U S D C for everything, C C T P for cross-chain routing, and U S Y C for idle yield, both mocked on testnet until Circle allowlists us, plus a staking bond that slashes a whale if it misbehaves. Whale Index is a proof-of-reasoning ledger with a buy button. That's the whole idea.",
+    "tts": "Under the hood: Arc for settlement, U S D C for everything, C C T P for cross-chain routing, and U S Y C for idle yield, both mocked on testnet until Circle approves us, plus a staking bond that slashes a whale if it misbehaves. Whale Index is a proof of reasoning ledger with a buy button. That's the whole idea.",
     "caption": "Arc settlement, USDC everywhere, CCTP routing and USYC yield (both mocked on testnet), plus a slashing bond. A proof-of-reasoning ledger with a buy button."
   }
 ]

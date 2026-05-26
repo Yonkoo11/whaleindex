@@ -6,7 +6,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 const KEY = process.env.ELEVENLABS_API_KEY;
 if (!KEY) { console.error("ELEVENLABS_API_KEY not in env"); process.exit(1); }
 
-const VOICE = "pNInz6obpgDQGcFmaJgB"; // Adam — calm, credible product narration
+const VOICE = "nPczCjzI2devNBz1zQrb"; // Brian — deep, resonant, comforting
 const MODEL = "eleven_multilingual_v2";
 const GAP = 0.4; // seconds of silence inserted between segments
 
