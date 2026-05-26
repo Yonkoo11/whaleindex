@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#0b0d0e">
-<title>WhaleIndex — a USDC index on Arc that mirrors Hyperliquid whales, with on-chain provenance</title>
+<title>WhaleIndex: a USDC index on Arc that mirrors Hyperliquid whales, with on-chain provenance</title>
 <meta name="description" content="A USDC-denominated index on Arc that mirrors top Hyperliquid whales. A four-agent pipeline decides each cycle and anchors its full reasoning on chain. Provenance, not trust. Live on Arc Testnet.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -74,7 +74,7 @@ a{color:inherit;}
 .brand{display:flex;align-items:center;gap:10px;font-weight:600;letter-spacing:-0.02em;font-size:15px;}
 .brand .mark{width:22px;height:22px;flex:none;}
 .brand .mark svg{display:block;}
-.net-pill{font-family:var(--mono);font-size:11px;letter-spacing:0.06em;color:var(--teal-dim);border:1px solid var(--teal-line);border-radius:999px;padding:4px 9px;display:inline-flex;align-items:center;gap:6px;}
+.net-pill{font-family:var(--mono);font-size:13px;letter-spacing:0.06em;color:var(--teal-dim);border:1px solid var(--teal-line);border-radius:999px;padding:4px 9px;display:inline-flex;align-items:center;gap:6px;}
 .net-pill .dot{width:6px;height:6px;border-radius:50%;background:var(--teal);}
 .net-pill.dim{color:var(--ink-3);border-color:var(--hair-strong);}
 .net-pill.dim .dot{background:var(--ink-3);}
@@ -122,17 +122,17 @@ a{color:inherit;}
 .node.is-veto{border-color:var(--veto-line);background:rgba(255,93,93,0.05);}
 .node-head{display:flex;align-items:center;justify-content:space-between;gap:8px;}
 .node-stage{display:flex;align-items:center;gap:8px;}
-.node-num{width:20px;height:20px;flex:none;border-radius:var(--r-md);display:grid;place-items:center;font-family:var(--mono);font-size:11px;font-weight:600;background:var(--teal-soft);color:var(--teal);border:1px solid var(--teal-line);}
+.node-num{width:20px;height:20px;flex:none;border-radius:var(--r-md);display:grid;place-items:center;font-family:var(--mono);font-size:13px;font-weight:600;background:var(--teal-soft);color:var(--teal);border:1px solid var(--teal-line);}
 .node.is-veto .node-num{background:var(--veto-soft);color:var(--veto);border-color:var(--veto-line);}
 .node-name{font-size:13px;font-weight:600;letter-spacing:-0.012em;}
-.node-status{font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;padding:3px 6px;border-radius:var(--r-sm);font-weight:600;background:var(--teal-soft);color:var(--teal);}
+.node-status{font-family:var(--mono);font-size:12px;letter-spacing:0.1em;text-transform:uppercase;padding:3px 6px;border-radius:var(--r-sm);font-weight:600;background:var(--teal-soft);color:var(--teal);}
 .node.is-veto .node-status{background:var(--veto-soft);color:var(--veto);}
 .node-summary{font-size:12.5px;color:var(--ink-2);line-height:1.45;min-height:50px;}
 .node-metric{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding-top:11px;border-top:1px solid var(--hair-soft);}
-.node-metric .m-label{font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-4);font-weight:500;}
+.node-metric .m-label{font-size:13px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-4);font-weight:500;}
 .node-metric .m-val{font-family:var(--mono);font-size:16px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink);letter-spacing:-0.01em;}
 .node.is-veto .m-val{color:var(--veto);}
-.node-cta{font-family:var(--mono);font-size:11px;color:var(--ink-4);letter-spacing:0.04em;display:flex;align-items:center;gap:5px;}
+.node-cta{font-family:var(--mono);font-size:13px;color:var(--ink-4);letter-spacing:0.04em;display:flex;align-items:center;gap:5px;}
 .node:hover .node-cta{color:var(--teal-dim);}
 .node.is-veto:hover .node-cta{color:var(--veto);}
 .connector{position:absolute;z-index:1;top:50%;height:2px;pointer-events:none;}
@@ -151,7 +151,7 @@ a{color:inherit;}
 .cell{border:1px solid var(--hair);border-radius:var(--r-lg);background:var(--bg-cell);padding:18px 18px 17px;position:relative;display:flex;flex-direction:column;}
 .cell-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;}
 .cell-head h3{font-size:13px;font-weight:600;letter-spacing:-0.012em;color:var(--ink);}
-.tag-pill{font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-4);border:1px solid var(--hair);border-radius:var(--r-sm);padding:2px 6px;font-weight:500;}
+.tag-pill{font-family:var(--mono);font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-4);border:1px solid var(--hair);border-radius:var(--r-sm);padding:2px 6px;font-weight:500;}
 .tag-pill.live{color:var(--teal-dim);border-color:var(--teal-line);}
 .c-nav{grid-column:span 5;}
 .c-rebal{grid-column:span 7;}
@@ -172,7 +172,7 @@ a{color:inherit;}
 .statline .si{flex:1;min-width:120px;padding:0 14px;border-left:1px solid var(--hair-soft);}
 .statline .si:first-child{padding-left:0;border-left:none;}
 .statline .si .sv{font-family:var(--mono);font-size:15px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;}
-.statline .si .sk2{font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-4);font-weight:500;margin-top:5px;}
+.statline .si .sk2{font-size:13px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-4);font-weight:500;margin-top:5px;}
 
 .rebal-figure{display:flex;flex-wrap:wrap;gap:0;}
 .rebal-item{flex:1;min-width:130px;padding:4px 16px;border-left:1px solid var(--hair-soft);}
@@ -180,7 +180,7 @@ a{color:inherit;}
 .rebal-item .d-val{font-family:var(--mono);font-size:21px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink);letter-spacing:-0.02em;display:flex;align-items:center;gap:7px;}
 .rebal-item.held .d-val{color:var(--teal);}
 .rebal-item .d-val svg{width:15px;height:15px;}
-.rebal-item .d-label{font-size:11px;text-transform:uppercase;letter-spacing:0.09em;color:var(--ink-4);font-weight:500;margin-top:6px;}
+.rebal-item .d-label{font-size:13px;text-transform:uppercase;letter-spacing:0.09em;color:var(--ink-4);font-weight:500;margin-top:6px;}
 .rebal-foot{margin-top:16px;padding-top:13px;border-top:1px solid var(--hair-soft);font-size:12.5px;color:var(--ink-2);line-height:1.5;}
 .rebal-foot b{color:var(--teal);font-weight:600;}
 .rebal-foot a{color:var(--teal-dim);}
@@ -225,7 +225,7 @@ a{color:inherit;}
 .attest-grid .ag{flex:1;min-width:110px;padding:0 14px;border-left:1px solid var(--hair-soft);}
 .attest-grid .ag:first-child{padding-left:0;border-left:none;}
 .attest-grid .ag .av{font-family:var(--mono);font-size:18px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;}
-.attest-grid .ag .ak{font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-4);font-weight:500;margin-top:5px;}
+.attest-grid .ag .ak{font-size:13px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-4);font-weight:500;margin-top:5px;}
 .slash-line{margin-top:14px;padding-top:13px;border-top:1px solid var(--hair-soft);font-family:var(--mono);font-size:12px;color:var(--ink-3);line-height:1.5;}
 .slash-line a{color:var(--teal-dim);}
 
@@ -252,18 +252,18 @@ a{color:inherit;}
 .ledger-card + .ledger-card{margin-top:14px;}
 .ledger-card .lc-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid var(--hair);}
 .ledger-card .lc-head h4{margin:0;font-size:13px;font-weight:600;letter-spacing:-0.012em;color:var(--ink);}
-.ledger-card .lc-head .lc-meta{font-family:var(--mono);font-size:11px;color:var(--ink-3);letter-spacing:0.04em;}
+.ledger-card .lc-head .lc-meta{font-family:var(--mono);font-size:13px;color:var(--ink-3);letter-spacing:0.04em;}
 .lc-pad{padding:6px 18px 16px;}
 table.scores{width:100%;border-collapse:collapse;}
 table.scores th,table.scores td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--hair-soft);}
-table.scores th{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-4);font-weight:500;}
+table.scores th{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-4);font-weight:500;}
 table.scores td{font-size:13px;color:var(--ink-2);}
 table.scores td.r,table.scores th.r{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;}
 table.scores tr:last-child td{border-bottom:none;}
 table.scores tr.top td{color:var(--ink);}
 .l-addr{font-family:var(--mono);font-size:12px;color:var(--ink-2);}
 table.scores tr.top .l-addr{color:var(--ink);}
-.l-flag{font-family:var(--mono);font-size:10px;padding:2px 6px;border-radius:var(--r-sm);background:rgba(255,255,255,0.05);color:var(--ink-3);margin-left:6px;letter-spacing:0.02em;}
+.l-flag{font-family:var(--mono);font-size:12px;padding:2px 6px;border-radius:var(--r-sm);background:rgba(255,255,255,0.05);color:var(--ink-3);margin-left:6px;letter-spacing:0.02em;}
 .l-flag.hype{color:var(--warn);background:rgba(227,179,65,0.10);}
 .l-flag.active{color:var(--teal);background:var(--teal-soft);}
 .scorebar{display:inline-flex;align-items:center;gap:8px;justify-content:flex-end;}
@@ -275,12 +275,12 @@ table.scores tr.top .l-addr{color:var(--ink);}
 .veto-row{display:grid;grid-template-columns:160px 1fr auto;gap:16px;align-items:center;padding:12px 0;border-bottom:1px solid var(--hair-soft);}
 .veto-row:last-child{border-bottom:none;}
 .vp-name{font-family:var(--mono);font-size:13px;color:var(--ink);}
-.vp-sub{font-family:var(--mono);font-size:11px;color:var(--ink-4);margin-top:3px;}
+.vp-sub{font-family:var(--mono);font-size:13px;color:var(--ink-4);margin-top:3px;}
 .vp-reasons{display:flex;flex-direction:column;gap:4px;}
 .vp-reason{font-size:12.5px;color:var(--ink-2);display:flex;align-items:center;gap:8px;}
 .vp-reason svg{width:12px;height:12px;color:var(--veto);flex:none;}
 .vp-reason .mono{color:var(--veto);}
-.vp-badge{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:0.06em;color:var(--veto);border:1px solid var(--veto-line);background:var(--veto-soft);padding:4px 9px;border-radius:var(--r-md);text-transform:uppercase;}
+.vp-badge{font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:0.06em;color:var(--veto);border:1px solid var(--veto-line);background:var(--veto-soft);padding:4px 9px;border-radius:var(--r-md);text-transform:uppercase;}
 .alloc-mini{display:flex;flex-direction:column;gap:6px;padding:6px 0 2px;}
 .alloc-mini .am{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;color:var(--ink-2);}
 
@@ -306,7 +306,7 @@ table.scores tr.top .l-addr{color:var(--ink);}
 .panel-close{width:36px;height:36px;border-radius:var(--r-sm);background:transparent;border:1px solid var(--hair);color:var(--ink-2);display:grid;place-items:center;transition:border-color var(--t-fast),color var(--t-fast);}
 .panel-close svg{width:14px;height:14px;}
 .panel-body{padding:18px 20px;overflow-y:auto;flex:1;}
-.panel-tag{font-family:var(--mono);font-size:11px;letter-spacing:0.06em;color:var(--ink-3);}
+.panel-tag{font-family:var(--mono);font-size:13px;letter-spacing:0.06em;color:var(--ink-3);}
 .panel-stat{display:flex;align-items:baseline;gap:10px;margin:6px 0 18px;}
 .panel-stat .ps-val{font-family:var(--mono);font-size:30px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-0.02em;}
 .panel-stat .ps-val.veto{color:var(--veto);}
@@ -323,7 +323,7 @@ table.scores tr.top .l-addr{color:var(--ink);}
 .kv .kv-v.veto{color:var(--veto);}
 .score-row{display:flex;align-items:center;gap:11px;padding:8px 0;border-bottom:1px solid var(--hair-soft);}
 .score-row:last-child{border-bottom:none;}
-.score-row .sr-rank{font-family:var(--mono);font-size:11px;color:var(--ink-4);width:18px;flex:none;}
+.score-row .sr-rank{font-family:var(--mono);font-size:13px;color:var(--ink-4);width:18px;flex:none;}
 .score-row .sr-addr{font-family:var(--mono);font-size:12px;color:var(--ink-2);flex:1;}
 .score-row .sr-bar{width:70px;height:6px;border-radius:999px;background:var(--bg-inset);overflow:hidden;flex:none;border:1px solid var(--hair-soft);}
 .score-row .sr-bar i{display:block;height:100%;background:var(--teal);}
@@ -334,7 +334,7 @@ table.scores tr.top .l-addr{color:var(--ink);}
 .prop-card.vetoed{border-color:var(--veto-line);background:rgba(255,93,93,0.04);}
 .prop-card .pc-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;}
 .prop-card .pc-name{font-family:var(--mono);font-size:12.5px;font-weight:600;color:var(--ink);}
-.prop-card .pc-verdict{font-family:var(--mono);font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--veto);background:var(--veto-soft);border:1px solid var(--veto-line);padding:2px 6px;border-radius:var(--r-sm);font-weight:600;}
+.prop-card .pc-verdict{font-family:var(--mono);font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:var(--veto);background:var(--veto-soft);border:1px solid var(--veto-line);padding:2px 6px;border-radius:var(--r-sm);font-weight:600;}
 .prop-card .pc-alloc{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;color:var(--ink-2);padding:3px 0;}
 .prop-card .pc-reason{margin-top:9px;padding-top:9px;border-top:1px solid var(--hair-soft);font-size:12px;color:var(--ink-3);line-height:1.5;}
 
@@ -354,7 +354,7 @@ table.scores tr.top .l-addr{color:var(--ink);}
 .field .input-wrap.invalid{border-color:var(--veto-line);}
 .field input{flex:1;background:transparent;border:none;outline:none;color:var(--ink);font-family:var(--mono);font-size:16px;font-variant-numeric:tabular-nums;padding:13px 0;letter-spacing:-0.01em;}
 .field .unit{font-family:var(--mono);font-size:13px;color:var(--ink-3);}
-.field .field-max{font-family:var(--mono);font-size:11px;color:var(--teal-dim);background:none;border:none;padding:2px 4px;min-height:32px;}
+.field .field-max{font-family:var(--mono);font-size:13px;color:var(--teal-dim);background:none;border:none;padding:2px 4px;min-height:32px;}
 .field .field-err{font-size:12px;color:var(--veto);margin-top:7px;min-height:15px;display:none;}
 .field .field-err.show{display:block;}
 .est-box{border:1px solid var(--hair);border-radius:var(--r-md);background:var(--bg-cell);padding:13px 14px;margin-bottom:18px;}
@@ -390,7 +390,7 @@ table.scores tr.top .l-addr{color:var(--ink);}
 .footer .cite{font-size:12px;color:var(--ink-4);line-height:1.6;max-width:620px;}
 .footer .cite a{color:var(--ink-3);}
 .footer .cite b{color:var(--ink-3);font-weight:500;}
-.footer-meta{font-family:var(--mono);font-size:11px;color:var(--ink-4);}
+.footer-meta{font-family:var(--mono);font-size:13px;color:var(--ink-4);}
 .footer-meta.refreshing{color:var(--teal-dim);}
 
 .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);z-index:300;background:var(--bg-inset);border:1px solid var(--teal-line);border-radius:var(--r-md);padding:9px 16px;font-size:12.5px;color:var(--teal);font-family:var(--mono);opacity:0;pointer-events:none;transition:opacity var(--t-fast),transform var(--t-fast);}
@@ -484,9 +484,9 @@ table.scores tr.top .l-addr{color:var(--ink);}
     <div class="hero-head">
       <span class="dateline"><span class="pulse" aria-hidden="true"></span><span id="cycleEyebrow">CYCLE 2026-05-25 21:51 UTC &middot; LIVE</span></span>
       <h1 class="thesis">
-        Every decision this index makes &mdash; <span class="em">including the decision to do nothing</span> &mdash; is published, hashed, and <span class="drop">anchored on&#8209;chain.</span>
+        Every decision this index makes, <span class="em">including the decision to do nothing</span>, is published, hashed, and <span class="drop">anchored on&#8209;chain.</span>
       </h1>
-      <p class="hero-sub">WhaleIndex mirrors the conviction of the best Hyperliquid traders, denominated in USDC. An autonomous four&#8209;agent pipeline decides each cycle. We don't ask you to trust the agent &mdash; we ask your browser to verify it. This cycle, the disciplined move was to hold.</p>
+      <p class="hero-sub">WhaleIndex mirrors the conviction of the best Hyperliquid traders, denominated in USDC. An autonomous four&#8209;agent pipeline decides each cycle. We don't ask you to trust the agent; we ask your browser to verify it. This cycle, the disciplined move was to hold.</p>
       <div class="hero-verdict-line" id="heroVerdict" aria-live="polite">
         <span class="verdict-chip"><span class="sk-inline skel"></span></span>
       </div>
@@ -926,7 +926,7 @@ function renderDecision(doc,dec){
   setText($("#nsScorer"),"Ranked "+whaleN+" whale wallets on PnL, Sharpe, drawdown, win rate and recency. "+activeCount+" are active right now; the rest are flat or withdrawn.");
   setText($("#nmAllocator"),String(PROPOSALS.length));
   const coins=new Set(); PROPOSALS.forEach(p=>(p.allocations||[]).forEach(a=>coins.add(a.coin)));
-  setText($("#nsAllocator"),"Built "+PROPOSALS.length+" weighting strategies — "+PROPOSALS.map(p=>p.name).join(", ").replace(/_/g," ")+" — over "+coins.size+" coins ("+Array.from(coins).join(" & ")+").");
+  setText($("#nsAllocator"),"Built "+PROPOSALS.length+" weighting strategies ("+PROPOSALS.map(p=>p.name).join(", ").replace(/_/g," ")+") across "+coins.size+" coins ("+Array.from(coins).join(" & ")+").");
   setText($("#nmRisk"), vetoCount+" / "+VERDICTS.length);
   let maxConc=null,dirBias=null;
   VERDICTS.forEach(v=>(v.reasons||[]).forEach(rr=>{
@@ -934,7 +934,7 @@ function renderDecision(doc,dec){
     m=rr.match(/directional bias[^=]*=\s*([\d.]+)%/); if(m) dirBias=Math.max(dirBias||0,parseFloat(m[1]));
   }));
   let riskSum="Rejected every proposal";
-  if(dirBias!=null) riskSum+=" — directional bias hit "+dirBias+"% (cap 80%)";
+  if(dirBias!=null) riskSum+=". Directional bias hit "+dirBias+"% (cap 80%)";
   if(maxConc!=null) riskSum+=" and concentration reached "+maxConc+"% (cap 50%)";
   setText($("#nsRisk"), riskSum+".");
   setText($("#nmCoordinator"), traded?"TRADED":"HELD");
@@ -945,7 +945,7 @@ function renderDecision(doc,dec){
 
   const rc=$("#rrChosen"); clear(rc);
   if(chosen){ rc.appendChild(document.createTextNode(chosen)); }
-  else { const s=document.createElement("span"); s.className="veto"; s.textContent="none — all vetoed"; rc.appendChild(s); }
+  else { const s=document.createElement("span"); s.className="veto"; s.textContent="none · all vetoed"; rc.appendChild(s); }
   setText($("#rrCoord"), traded?"rebalanced this cycle":"no rebalance this cycle");
   setText($("#rrSnap"), snapIso||"—");
   setText($("#rrWhales"), whaleN+" · doc v"+(doc.version||"2"));
@@ -966,7 +966,7 @@ function renderDecision(doc,dec){
 
   const foot=$("#rebalFoot"); clear(foot);
   if(traded){ foot.appendChild(document.createTextNode("Agent rebalanced the book this cycle. ")); const b=document.createElement("b"); b.textContent="Reasoning anchored ✓"; foot.appendChild(b); }
-  else { foot.appendChild(document.createTextNode("0 changes · agent held · ")); const b=document.createElement("b"); b.textContent="reasoning anchored ✓"; foot.appendChild(b); foot.appendChild(document.createTextNode(" — a quiet cycle is a disciplined one, not a missing one.")); }
+  else { foot.appendChild(document.createTextNode("0 changes · agent held · ")); const b=document.createElement("b"); b.textContent="reasoning anchored ✓"; foot.appendChild(b); foot.appendChild(document.createTextNode(". A quiet cycle is a disciplined one, not a missing one.")); }
 
   buildLedger();
 }
@@ -1010,7 +1010,7 @@ async function runVerify(){
       check.classList.remove("ok");
       setText(src,"content hash");
       text.appendChild(document.createTextNode("Your browser recomputed the content hash of the decision document. "));
-      const ok=document.createElement("span"); ok.className="ok-word"; ok.textContent="It is reproducible — anyone can rerun it."; text.appendChild(ok);
+      const ok=document.createElement("span"); ok.className="ok-word"; ok.textContent="It is reproducible. Anyone can rerun it."; text.appendChild(ok);
       const eq1=document.createElement("span"); eq1.className="eq"; eq1.textContent="0x"+digest.slice(0,12)+"…"+digest.slice(-10);
       hashEl.appendChild(document.createTextNode("sha256(doc) computed in your browser = ")); hashEl.appendChild(eq1); hashEl.appendChild(document.createElement("br"));
       const eq2=document.createElement("span"); eq2.className="eq"; eq2.textContent="0x"+(anchored?anchored.slice(0,12)+"…"+anchored.slice(-10):"—");
@@ -1114,12 +1114,12 @@ function fillPanel(which){
       (p.allocations||[]).forEach(a=>{ const r=document.createElement("div"); r.className="pc-alloc"; const s1=document.createElement("span"); s1.textContent=a.coin+" · "+a.direction; const s2=document.createElement("span"); s2.textContent="$"+Number(a.target_notional_usd).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); r.append(s1,s2); card.appendChild(r); });
       const rs=document.createElement("div"); rs.className="pc-reason"; rs.textContent=p.reasoning||""; card.appendChild(rs); wrap.appendChild(card); });
     body.appendChild(sec("Drafted proposals", wrap));
-    const note=document.createElement("p"); note.className="panel-reason"; note.style.color="var(--ink-3)"; note.textContent="All proposals concentrate on the coins with meaningful aggregate whale notional this snapshot — which is exactly what trips the Risk gate next."; body.appendChild(note);
+    const note=document.createElement("p"); note.className="panel-reason"; note.style.color="var(--ink-3)"; note.textContent="All proposals concentrate on the coins with meaningful aggregate whale notional this snapshot, which is exactly what trips the Risk gate next."; body.appendChild(note);
   } else if(which==="risk"){
     const vc=VERDICTS.filter(v=>v.verdict==="veto").length;
     body.appendChild(tag("RiskAgent · hard gates","var(--veto)"));
     body.appendChild(stat(vc+" / "+VERDICTS.length, "proposals vetoed", true));
-    body.appendChild(sec("Why every proposal failed", reason("Both active whales are long, so the book would be 100% directional with no hedge — over the 80% cap. The score-weighted proposal also pushes most of the book into a single coin, past the 50% concentration ceiling.")));
+    body.appendChild(sec("Why every proposal failed", reason("Both active whales are long, so the book would be 100% directional with no hedge, over the 80% cap. The score-weighted proposal also pushes most of the book into a single coin, past the 50% concentration ceiling.")));
     const wrap=document.createElement("div");
     VERDICTS.forEach(v=>{ const card=document.createElement("div"); card.className="prop-card vetoed";
       const head=document.createElement("div"); head.className="pc-head"; const nm=document.createElement("span"); nm.className="pc-name"; nm.textContent=v.proposal_name; const vd=document.createElement("span"); vd.className="pc-verdict"; vd.textContent=v.verdict; head.append(nm,vd); card.appendChild(head);
@@ -1238,7 +1238,7 @@ async function refreshRebalance(prov,latest){
   const exec=new Contract(ARC.addresses.RebalanceExecutor, ABI_EXEC, prov);
   const alloc=await findLatestEvent(exec,"AllocationDecided",latest);
   const settleEl=$("#rebalSettle");
-  if(!alloc){ if(settleEl){ setText(settleEl,"n/a"); settleEl.title="No on-chain rebalance this cycle — the agent held."; } setText($("#chainArcVal"),"—"); return; }
+  if(!alloc){ if(settleEl){ setText(settleEl,"n/a"); settleEl.title="No on-chain rebalance this cycle. The agent held."; } setText($("#chainArcVal"),"—"); return; }
   const reportedAt=Number(alloc.args.reportedAt);
   const txHash=alloc.transactionHash;
   try{
@@ -1270,7 +1270,7 @@ async function refreshAttestation(prov,latest){
       const isvg=document.createElementNS("http://www.w3.org/2000/svg","svg"); isvg.setAttribute("viewBox","0 0 18 18"); isvg.setAttribute("fill","none");
       const ip=document.createElementNS("http://www.w3.org/2000/svg","path"); ip.setAttribute("d","M9 1l7 3v5c0 4-3 6.5-7 8-4-1.5-7-4-7-8V4l7-3z"); ip.setAttribute("stroke","currentColor"); ip.setAttribute("stroke-width","1.3"); ip.setAttribute("stroke-linejoin","round"); isvg.appendChild(ip); icon.appendChild(isvg);
       const big=document.createElement("div"); big.className="attest-big"; big.textContent="0 bonded";
-      const cp=document.createElement("div"); cp.className="attest-copy"; cp.appendChild(document.createTextNode("No whale has staked a bond yet. The ")); const b=document.createElement("b"); b.textContent="WhaleAttestation"; cp.appendChild(b); cp.appendChild(document.createTextNode(" contract is live and ready to slash — there is simply nothing to attest this cycle. This is the honest empty state, not a failed read."));
+      const cp=document.createElement("div"); cp.className="attest-copy"; cp.appendChild(document.createTextNode("No whale has staked a bond yet. The ")); const b=document.createElement("b"); b.textContent="WhaleAttestation"; cp.appendChild(b); cp.appendChild(document.createTextNode(" contract is live and ready to slash. There is simply nothing to attest this cycle. This is the honest empty state, not a failed read."));
       empty.append(icon,big,cp); content.appendChild(empty);
       return;
     }
@@ -1282,7 +1282,7 @@ async function refreshAttestation(prov,latest){
     content.appendChild(grid);
     const sl=document.createElement("div"); sl.className="slash-line";
     if(slashLogs.length){ const latestSlash=slashLogs[slashLogs.length-1]; sl.appendChild(document.createTextNode(short(getAddress(latestSlash.args.wallet))+" slashed "+(Number(latestSlash.args.slashBps)/100).toFixed(1)+"% · $"+fmtUsd(totalSlashed,6,2)+" total · ")); sl.appendChild(makeLink(ARC.explorer+"/tx/"+latestSlash.transactionHash,"tx")); }
-    else { sl.textContent="No slashes — every bonded whale has stayed within the decay threshold."; }
+    else { sl.textContent="No slashes. Every bonded whale has stayed within the decay threshold."; }
     content.appendChild(sl);
   }catch(e){
     clear(content); const cp=document.createElement("div"); cp.className="attest-copy"; cp.textContent="Attestation read failed: "+(e.shortMessage||e.message||""); content.appendChild(cp);
@@ -1458,7 +1458,7 @@ function validate(){
 function humanError(e){
   const msg=(e && (e.shortMessage||e.reason||e.message)||"").toString();
   if(/user rejected|denied|4001/i.test(msg)) return "You cancelled the request in your wallet.";
-  if(/StaleNAV|stale/i.test(msg)) return "NAV is stale on-chain right now — buys are paused until the oracle refreshes. Try again shortly.";
+  if(/StaleNAV|stale/i.test(msg)) return "NAV is stale on-chain right now, so buys are paused until the oracle refreshes. Try again shortly.";
   if(/ZeroAmount/i.test(msg)) return "Amount must be greater than zero.";
   if(/InsufficientLiquidity/i.test(msg)) return "The index does not hold enough USDC to cover this redemption right now.";
   if(/paused|whenNotPaused|EnforcedPause/i.test(msg)) return "The contract is paused. Buys and redemptions are temporarily disabled.";
